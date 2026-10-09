@@ -1,0 +1,80 @@
+{
+  "id": "ChIJTestPlace_Id0",
+  "displayName": { "text": "Example Café", "languageCode": "de" },
+  "rating": 4.8,
+  "userRatingCount": 201,
+  "reviews": [
+    {
+      "name": "places/ChIJTestPlace_Id0/reviews/ChdDSUhNMG9nS0VJQ0FnSUNfQUFB",
+      "relativePublishTimeDescription": "vor 3 Monaten",
+      "rating": 5,
+      "text": { "text": "Translated text that should not be used when the original is there.", "languageCode": "en" },
+      "originalText": { "text": "Wunderschönes Café mitten im Hofladen mit riesiger Fensterfront und Blick in die Berge.\nGroße sonnige Terrasse, toller Service, bester Kaffee und leckere Kuchen.", "languageCode": "de" },
+      "authorAttribution": {
+        "displayName": "Anna Beispiel",
+        "uri": "https://www.google.com/maps/contrib/100000000000000000001/reviews",
+        "photoUri": "https://lh3.googleusercontent.com/a/example=s128-c0x00000000-cc-rp-mo"
+      },
+      "publishTime": "2026-07-14T09:12:33.123456Z",
+      "flagContentUri": "https://www.google.com/local/review/rap/report?postId=ChdDSUhNMG9nS0VJQ0FnSUNfQUFB",
+      "googleMapsUri": "https://www.google.com/maps/reviews/data=!4m6!14m5!1m4!2m3!1sChdDSUhNMG9nS0VJQ0FnSUNfQUFB!2m1!1s0x0:0x1"
+    },
+    {
+      "name": "places/ChIJTestPlace_Id0/reviews/ChdDSUhNMG9nS0VJQ0FnSUNfQkJC",
+      "relativePublishTimeDescription": "vor einem Monat",
+      "rating": 4,
+      "text": { "text": "Nettes Personal, schöner Außenbereich und das Essen wirklich schmackhaft. Für vier Sterne reicht es, die Wartezeit war etwas lang.", "languageCode": "de" },
+      "originalText": { "text": "Nettes Personal, schöner Außenbereich und das Essen wirklich schmackhaft. Für vier Sterne reicht es, die Wartezeit war etwas lang.", "languageCode": "de" },
+      "authorAttribution": {
+        "displayName": "Bernd Vier",
+        "uri": "https://www.google.com/maps/contrib/100000000000000000002/reviews",
+        "photoUri": "https://lh3.googleusercontent.com/a/example2=s128"
+      },
+      "publishTime": "2026-09-01T17:40:00Z",
+      "flagContentUri": "https://www.google.com/local/review/rap/report?postId=ChdDSUhNMG9nS0VJQ0FnSUNfQkJC",
+      "googleMapsUri": "https://www.google.com/maps/reviews/data=!4m6!14m5!1m4!2m3!1sChdDSUhNMG9nS0VJQ0FnSUNfQkJC!2m1!1s0x0:0x1"
+    },
+    {
+      "name": "places/ChIJTestPlace_Id0/reviews/ChdDSUhNMG9nS0VJQ0FnSUNfQ0ND",
+      "relativePublishTimeDescription": "vor 2 Wochen",
+      "rating": 5,
+      "text": { "text": "Top Service!", "languageCode": "de" },
+      "originalText": { "text": "Top Service!", "languageCode": "de" },
+      "authorAttribution": {
+        "displayName": "Carla Kurz",
+        "uri": "https://www.google.com/maps/contrib/100000000000000000003/reviews",
+        "photoUri": "https://lh3.googleusercontent.com/a/example3=s128"
+      },
+      "publishTime": "2026-09-20T08:00:00Z",
+      "flagContentUri": "https://www.google.com/local/review/rap/report?postId=ChdDSUhNMG9nS0VJQ0FnSUNfQ0ND",
+      "googleMapsUri": "https://www.google.com/maps/reviews/data=!4m6!14m5!1m4!2m3!1sChdDSUhNMG9nS0VJQ0FnSUNfQ0ND!2m1!1s0x0:0x1"
+    },
+    {
+      "name": "places/ChIJTestPlace_Id0/reviews/ChdDSUhNMG9nS0VJQ0FnSUNfRERE",
+      "relativePublishTimeDescription": "vor einer Woche",
+      "rating": 5,
+      "authorAttribution": {
+        "displayName": "Dora Stumm",
+        "uri": "https://www.google.com/maps/contrib/100000000000000000004/reviews",
+        "photoUri": "https://lh3.googleusercontent.com/a/example4=s128"
+      },
+      "publishTime": "2026-10-01T12:00:00Z",
+      "flagContentUri": "https://www.google.com/local/review/rap/report?postId=ChdDSUhNMG9nS0VJQ0FnSUNfRERE",
+      "googleMapsUri": "https://www.google.com/maps/reviews/data=!4m6!14m5!1m4!2m3!1sChdDSUhNMG9nS0VJQ0FnSUNfRERE!2m1!1s0x0:0x1"
+    },
+    {
+      "name": "places/ChIJTestPlace_Id0/reviews/ChdDSUhNMG9nS0VJQ0FnSUNfRUVF",
+      "relativePublishTimeDescription": "vor 2 Jahren",
+      "rating": 5,
+      "text": { "text": "Ich habe den Hof spontan entdeckt, um mittags zu essen. Absolut zu empfehlen: nettes Personal, schöner Außenbereich und das Essen wirklich schmackhaft.", "languageCode": "de" },
+      "originalText": { "text": "Ich habe den Hof spontan entdeckt, um mittags zu essen. Absolut zu empfehlen: nettes Personal, schöner Außenbereich und das Essen wirklich schmackhaft.", "languageCode": "de" },
+      "authorAttribution": {
+        "displayName": "",
+        "uri": "https://www.google.com/maps/contrib/100000000000000000005/reviews",
+        "photoUri": "https://lh3.googleusercontent.com/a/example5=s128"
+      },
+      "publishTime": "2024-09-01T12:00:00Z",
+      "flagContentUri": "https://www.google.com/local/review/rap/report?postId=ChdDSUhNMG9nS0VJQ0FnSUNfRUVF"
+    }
+  ]
+}

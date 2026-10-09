@@ -1,0 +1,216 @@
+<?php
+
+namespace Koe;
+
+use Closure;
+
+/**
+ * Places API (New): find the place by text, read rating, count and reviews,
+ * and turn the answer into the format 2 data file.
+ *
+ * The transport is a closure (url, headers, body|null) → ['status' => int,
+ * 'body' => string], so tests run against recorded answers without a
+ * network. The real one (defaultTransport()) uses ext-curl when present,
+ * otherwise PHP's HTTP stream wrapper.
+ *
+ * Errors are PlacesException with a message that never contains the request
+ * or the key: only Google's status and message, or the transport failure.
+ */
+final class Places
+{
+    public const ENDPOINT = 'https://places.googleapis.com/v1/';
+
+    /** Fields the details call asks for. `reviews` returns all sub-fields, including googleMapsUri. */
+    public const DETAILS_MASK = 'id,displayName,rating,userRatingCount,reviews';
+
+    public function __construct(private readonly Closure $transport, private readonly string $key)
+    {
+    }
+
+    /**
+     * First hit of a text search: `['id' => 'ChIJ…', 'name' => 'Business']`.
+     *
+     * Text search instead of a fixed place id on purpose: it survives the
+     * listing being recreated. If the Google profile changes its name or
+     * address, the query must follow, otherwise nothing is found.
+     *
+     * @throws PlacesException when nothing is found or the API fails
+     */
+    public function search(string $query, string $language = 'en'): array
+    {
+        $answer = $this->call('places:searchText', 'places.id,places.displayName', [
+            'textQuery' => $query,
+            'languageCode' => $language,
+        ]);
+        $places = $answer['places'] ?? [];
+        if (!is_array($places) || $places === [] || !isset($places[0]['id'])) {
+            throw new PlacesException('Places search found nothing for: ' . $query);
+        }
+        return [
+            'id' => (string) $places[0]['id'],
+            'name' => (string) ($places[0]['displayName']['text'] ?? ''),
+        ];
+    }
+
+    /**
+     * Details of a place (rating, count, reviews), decoded.
+     *
+     * @throws PlacesException
+     */
+    public function details(string $placeId, string $language = 'en'): array
+    {
+        return $this->call('places/' . rawurlencode($placeId) . '?languageCode=' . rawurlencode($language), self::DETAILS_MASK);
+    }
+
+    /**
+     * Builds the format 2 file from a details answer. Always the COMPLETE
+     * current answer (no merge with earlier runs: Places policies allow about
+     * 24 hours of caching, nothing is archived). Reviews without text are
+     * skipped visibly — they are worthless as a quote and already part of
+     * Google's count.
+     *
+     * @return array{data: array, messages: list<string>}
+     */
+    public static function parse(array $details, string $placeId, string $today): array
+    {
+        $messages = [];
+        $reviews = [];
+        foreach ((array) ($details['reviews'] ?? []) as $review) {
+            if (!is_array($review)) {
+                continue;
+            }
+            $author = is_array($review['authorAttribution'] ?? null) ? $review['authorAttribution'] : [];
+            $name = trim((string) ($author['displayName'] ?? ''));
+            $date = substr((string) ($review['publishTime'] ?? ''), 0, 10);
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                $date = $today;
+            }
+            $text = trim((string) (($review['originalText'] ?? $review['text'] ?? [])['text'] ?? ''));
+            $label = ($name !== '' ? $name : 'anonymous') . ', ' . $date;
+            if ($text === '') {
+                $messages[] = '  skipped (no text): ' . $label;
+                continue;
+            }
+            // `name` is "places/<place>/reviews/<id>"; the id is what koe.approved lists.
+            $id = (string) ($review['name'] ?? '');
+            $slash = strrpos($id, '/');
+            $id = $slash === false ? $id : substr($id, $slash + 1);
+            $authorUrl = trim((string) ($author['uri'] ?? ''));
+            // Link to the single review; without googleMapsUri the author profile as a stand-in.
+            $url = trim((string) ($review['googleMapsUri'] ?? '')) ?: $authorUrl;
+            $entry = [
+                'id'     => $id !== '' ? $id : null,
+                'name'   => $name,
+                'date'   => $date,
+                'rating' => (int) ($review['rating'] ?? 5),
+                'text'   => $text,
+                'source' => 'google',
+            ];
+            if ($url !== '') {
+                $entry['url'] = $url;
+            }
+            if ($authorUrl !== '') {
+                $entry['authorUrl'] = $authorUrl;
+            }
+            $reviews[] = $entry;
+            $messages[] = '  ' . ($entry['id'] ?? '(no id)') . '  ' . $label . ', ' . $entry['rating'] . ' stars' . ($url === '' ? ' (no link)' : '');
+        }
+        usort($reviews, fn ($a, $b) => strcmp($b['date'], $a['date']));
+        $rating = $details['rating'] ?? null;
+        $count = $details['userRatingCount'] ?? null;
+        $data = [
+            'format'    => Reviews::FORMAT,
+            'fetchedAt' => $today,
+            'note'      => 'Replaced completely by koe-fetch on every run (Places policies: no archive, '
+                . 'cached for about 24 hours). The Places API returns at most five reviews.',
+            'placeId'   => $placeId,
+            'rating'    => is_numeric($rating) ? (float) $rating : null,
+            'count'     => is_numeric($count) ? (int) $count : count($reviews),
+            'reviews'   => $reviews,
+        ];
+        $messages[] = count($reviews) . ' reviews stored; Google reports ' . $data['count']
+            . ' with an average of ' . ($data['rating'] ?? '?') . '.';
+        return ['data' => $data, 'messages' => $messages];
+    }
+
+    /** @throws PlacesException */
+    private function call(string $path, string $fieldMask, ?array $body = null): array
+    {
+        $headers = [
+            'Content-Type: application/json',
+            'X-Goog-Api-Key: ' . $this->key,
+            'X-Goog-FieldMask: ' . $fieldMask,
+        ];
+        try {
+            $answer = ($this->transport)(self::ENDPOINT . $path, $headers, $body === null ? null : json_encode($body, JSON_THROW_ON_ERROR));
+        } catch (PlacesException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new PlacesException('Places API not reachable: ' . self::scrub($e->getMessage(), $this->key));
+        }
+        $status = (int) ($answer['status'] ?? 0);
+        $decoded = json_decode((string) ($answer['body'] ?? ''), true);
+        if ($status !== 200) {
+            $error = is_array($decoded) && is_array($decoded['error'] ?? null) ? $decoded['error'] : [];
+            $detail = trim((string) ($error['status'] ?? '') . ' ' . (string) ($error['message'] ?? ''));
+            $hint = $status === 429 || ($error['status'] ?? '') === 'RESOURCE_EXHAUSTED'
+                ? ' — the daily quota of the Google Cloud project is used up; the data file is left as it is.'
+                : '';
+            throw new PlacesException('Places API answered ' . $status . ($detail !== '' ? ' ' . self::scrub($detail, $this->key) : '') . $hint);
+        }
+        if (!is_array($decoded)) {
+            throw new PlacesException('Places API answered 200 with a body that is not JSON.');
+        }
+        return $decoded;
+    }
+
+    /** The key must never appear in any output — not even via a quoted error message. */
+    public static function scrub(string $text, string $key): string
+    {
+        return $key === '' ? $text : str_replace($key, '[key]', $text);
+    }
+
+    /** ext-curl when available, otherwise the HTTP stream wrapper. */
+    public static function defaultTransport(int $timeout = 30): Closure
+    {
+        return function (string $url, array $headers, ?string $body) use ($timeout): array {
+            if (function_exists('curl_init')) {
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_TIMEOUT => $timeout,
+                    CURLOPT_POST => $body !== null,
+                    CURLOPT_POSTFIELDS => $body ?? '',
+                ]);
+                $response = curl_exec($ch);
+                if ($response === false) {
+                    $error = curl_error($ch);
+                    curl_close($ch);
+                    throw new \RuntimeException($error);
+                }
+                $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+                curl_close($ch);
+                return ['status' => $status, 'body' => (string) $response];
+            }
+            $context = stream_context_create(['http' => [
+                'method' => $body === null ? 'GET' : 'POST',
+                'header' => implode("\r\n", $headers),
+                'content' => $body ?? '',
+                'timeout' => $timeout,
+                'ignore_errors' => true,
+            ]]);
+            $response = @file_get_contents($url, false, $context);
+            if ($response === false) {
+                throw new \RuntimeException(error_get_last()['message'] ?? 'request failed');
+            }
+            $status = 0;
+            foreach ($http_response_header ?? [] as $line) {
+                if (preg_match('~^HTTP/\S+\s+(\d{3})~', $line, $m)) {
+                    $status = (int) $m[1];
+                }
+            }
+            return ['status' => $status, 'body' => $response];
+        };
+    }
+}

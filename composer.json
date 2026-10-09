@@ -1,0 +1,46 @@
+{
+    "name": "sayamaapps/kirby-koe",
+    "description": "Google reviews for Kirby CMS, served from your own server: a nightly fetch via the Places API (New), rule-based selection, no request to Google from the visitor's browser.",
+    "type": "kirby-plugin",
+    "license": "MIT",
+    "keywords": ["kirby", "kirby-plugin", "kirby-5", "google", "reviews", "places-api", "privacy"],
+    "homepage": "https://github.com/simsimmal/kirby-koe",
+    "authors": [
+        {
+            "name": "Simon Räder",
+            "homepage": "https://sayamaapps.de"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/simsimmal/kirby-koe/issues",
+        "source": "https://github.com/simsimmal/kirby-koe"
+    },
+    "require": {
+        "php": "^8.2",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "getkirby/composer-installer": "^1.2"
+    },
+    "require-dev": {
+        "getkirby/cms": "^5.0"
+    },
+    "bin": [
+        "bin/koe-fetch"
+    ],
+    "scripts": {
+        "test": "sh tests/run.sh"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "getkirby/composer-installer": true
+        },
+        "platform": {
+            "php": "8.2.0"
+        }
+    },
+    "extra": {
+        "installer-name": "koe",
+        "kirby-cms-path": false
+    }
+}

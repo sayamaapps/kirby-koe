@@ -1,0 +1,29 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Fetches the Google reviews of one business and writes the Koe data file —
+ * on a server or CI runner, never from the website: the visitor's browser
+ * does not talk to Google.
+ *
+ *   GOOGLE_PLACES_API_KEY=… KOE_QUERY="Name, Street 1, 12345 Town" vendor/bin/koe-fetch
+ *   php site/plugins/koe/bin/koe-fetch --query="…" --file=site/data/reviews.json --language=de
+ *
+ * Run it from the project root: a relative KOE_FILE / --file is taken from
+ * the current directory. Settings, exit codes and the file format are
+ * described in src/Fetch.php and the README ("Nightly fetch").
+ */
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
+require_once dirname(__DIR__) . '/src/I18n.php';
+require_once dirname(__DIR__) . '/src/Reviews.php';
+require_once dirname(__DIR__) . '/src/PlacesException.php';
+require_once dirname(__DIR__) . '/src/Places.php';
+require_once dirname(__DIR__) . '/src/Fetch.php';
+// Only Options::resolve() and the path constants are used here; the rest of
+// that class needs Kirby, which is not loaded by this script.
+require_once dirname(__DIR__) . '/src/Options.php';
+
+exit(Koe\Fetch::run(getenv(), $argv, null, (string) getcwd(), STDOUT, STDERR));
