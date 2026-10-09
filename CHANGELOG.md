@@ -13,7 +13,7 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
-## [1.0.0] — Unreleased
+## [1.0.0] — 2026-10-09
 
 First release as a Composer package. Before 1.0.0 the code lived as a copy
 named `bewertungen` in each site (`site/plugins/bewertungen/`,
