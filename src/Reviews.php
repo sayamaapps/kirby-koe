@@ -94,6 +94,12 @@ final class Reviews
     /** @return array{format: int, fetchedAt: ?string, placeId: ?string, rating: float, count: int, reviews: list<array<string,mixed>>}|null */
     public static function normalize(array $data): ?array
     {
+        // A format this reader does not know (a newer one, or a typo) is not
+        // guessed at: the section stays empty and the log names the format.
+        if (isset($data['format']) && !in_array($data['format'], [1, 2], true)) {
+            error_log('koe: unknown data file format ' . json_encode($data['format']) . ' (this version reads formats 1 and 2)');
+            return null;
+        }
         $legacy = !isset($data['reviews']) && isset($data['bewertungen']);
         $reviews = $legacy ? ($data['bewertungen'] ?? null) : ($data['reviews'] ?? null);
         $rating = $legacy ? ($data['gesamtwertung'] ?? null) : ($data['rating'] ?? null);

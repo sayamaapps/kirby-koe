@@ -13,6 +13,16 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [Unreleased]
+
+### Changed
+
+- A data file whose `format` is neither 1 nor 2 is refused: the reader logs
+  `koe: unknown data file format …` and shows nothing, like a missing file.
+  Before, such a file was read as format 2 and could show reviews the reader
+  does not understand. A file without `format` is detected by its keys as
+  before.
+
 ## [1.0.1] — 2026-10-10
 
 ### Fixed
