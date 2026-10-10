@@ -176,13 +176,21 @@ final class Places
         return function (string $url, array $headers, ?string $body) use ($timeout): array {
             if (function_exists('curl_init')) {
                 $ch = curl_init($url);
-                curl_setopt_array($ch, [
+                $options = [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_HTTPHEADER => $headers,
                     CURLOPT_TIMEOUT => $timeout,
-                    CURLOPT_POST => $body !== null,
-                    CURLOPT_POSTFIELDS => $body ?? '',
-                ]);
+                ];
+                if ($body === null) {
+                    // Never set CURLOPT_POSTFIELDS for a GET: libcurl switches the
+                    // method to POST as soon as the option is set, even to an empty
+                    // string — Google then answers 404 for places/{id} (seen 10.10.2026).
+                    $options[CURLOPT_HTTPGET] = true;
+                } else {
+                    $options[CURLOPT_POST] = true;
+                    $options[CURLOPT_POSTFIELDS] = $body;
+                }
+                curl_setopt_array($ch, $options);
                 $response = curl_exec($ch);
                 if ($response === false) {
                     $error = curl_error($ch);

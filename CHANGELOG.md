@@ -13,6 +13,17 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [1.0.1] — 2026-10-10
+
+### Fixed
+
+- `koe-fetch` failed with `Places API answered 404` on the details call when
+  PHP's ext-curl was used (the first nightly run on a real site, mustergasthaus).
+  The transport set `CURLOPT_POSTFIELDS` to an empty string for GET requests;
+  libcurl treats any `POSTFIELDS` as "this is a POST", and
+  `POST places/{id}` does not exist. GET requests now never touch the POST
+  options. The stream-wrapper fallback was unaffected.
+
 ## [1.0.0] — 2026-10-09
 
 First release as a Composer package. Before 1.0.0 the code lived as a copy
