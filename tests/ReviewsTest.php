@@ -120,6 +120,21 @@ try {
     $g = Reviews::load($tmpFile(['format' => 2, 'rating' => 4.9, 'count' => 7, 'reviews' => [$r('One', 5, '2026-09-01', null, 'id-1')]]), $rules, $today);
     expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'One' && $g['reviews'][0]['id'] === 'id-1' && $g['placeId'] === null, 'load with one review, no place id');
 
+    // Format field: 1 and 2 are read, with or without the field; any other value is refused and logged.
+    $logFile = tempnam(sys_get_temp_dir(), 'koelog');
+    $files[] = $logFile;
+    ini_set('error_log', $logFile);
+    $g = Reviews::load($tmpFile(['rating' => 4.7, 'count' => 42, 'reviews' => [$r('NoField', 5, '2026-09-01', null, 'id-2')]]), $rules, $today);
+    expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'NoField', 'format 2 without format field is read');
+    $g = Reviews::load($tmpFile(['format' => 2, 'rating' => 4.7, 'count' => 42, 'reviews' => [$r('Explicit', 5, '2026-09-01', null, 'id-3')]]), $rules, $today);
+    expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'Explicit', 'format 2 with format field is read');
+    expect('', (string) file_get_contents($logFile), 'readable formats log nothing');
+    $future = ['format' => 3, 'placeId' => 'ChIJFile', 'rating' => 4.7, 'count' => 42, 'fetchedAt' => '2026-10-05', 'reviews' => [$r('Future', 5, '2026-09-01', null, 'id-4')]];
+    expect(null, Reviews::load($tmpFile($future), $rules, $today), 'format 3 with format 2 keys: section stays empty');
+    expect(null, Reviews::normalize(['format' => 0, 'rating' => 4.7, 'reviews' => [$r('Zero', 5, '2026-09-01')]]), 'format 0 refused');
+    expect(true, str_contains((string) file_get_contents($logFile), 'koe: unknown data file format 3'), 'unknown format is logged with its value');
+    ini_restore('error_log');
+
     // Format 1 (the pre-1.0 file): German keys read as before, no ids, no place id.
     $old = ['stand' => '2026-10-04', 'hinweis' => '…', 'gesamtwertung' => 4.8, 'anzahl' => 201, 'bewertungen' => [
         $legacy('Mit Link', 5, '2026-09-01', null, 'https://maps.google.com/?cid=42'),

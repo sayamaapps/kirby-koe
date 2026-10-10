@@ -13,6 +13,25 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [Unreleased]
+
+### Fixed
+
+- A nightly fetch that got no usable review from Google (every review without
+  text, or none at all) overwrote the data file with an empty list. The page
+  then hid the rating and the count until the next run. When the file still
+  holds reviews, `koe-fetch` now keeps it, prints one line on STDERR and exits
+  with 0 (the workflow sees no change and does not commit). An empty or
+  missing file is written as before.
+
+### Changed
+
+- A data file whose `format` is neither 1 nor 2 is refused: the reader logs
+  `koe: unknown data file format …` and shows nothing, like a missing file.
+  Before, such a file was read as format 2 and could show reviews the reader
+  does not understand. A file without `format` is detected by its keys as
+  before.
+
 ## [1.0.1] — 2026-10-10
 
 ### Fixed

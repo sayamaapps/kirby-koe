@@ -218,6 +218,30 @@ try {
         chmod($locked, 0700);
     }
 
+    // Empty answer, file with two reviews: the file stays, exit 0, one line on STDERR.
+    $two = $data;
+    $two['reviews'] = array_slice($data['reviews'], 0, 2);
+    expect(true, Fetch::write($file, $two), 'setup: two-review file written');
+    $before = file_get_contents($file);
+    $empty = json_encode(['id' => 'ChIJTestPlace_Id0', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => []]);
+    [$code, $out, $err] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty]]), ['koe-fetch'], '2026-10-11');
+    expect(Fetch::EXIT_OK, $code, 'empty answer: exit 0');
+    expect($before, file_get_contents($file), 'empty answer: existing file untouched');
+    expect("Google returned no usable reviews; keeping the existing file (2 reviews)\n", $err, 'empty answer: one line on STDERR');
+    expect(false, str_contains($out, 'Written:'), 'empty answer: nothing written');
+
+    // Empty answer, no file: written, with an empty review list.
+    unlink($file);
+    [$code, , $err] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty]]), ['koe-fetch'], '2026-10-11');
+    expect(true, $code === Fetch::EXIT_OK && $err === '' && json_decode(file_get_contents($file), true)['reviews'] === [], 'empty answer, no file: written without notice');
+
+    // Empty answer, file without reviews: the guard does not apply (no notice, exit 0), the write rule is unchanged.
+    $none = $data;
+    $none['reviews'] = [];
+    Fetch::write($file, $none);
+    [$code, , $err] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty]]), ['koe-fetch'], '2026-10-12');
+    expect(true, $code === Fetch::EXIT_OK && $err === '', 'empty answer, file without reviews: no notice');
+
     // The real transport exists and uses curl when available (no request is made here).
     expect(true, Places::defaultTransport() instanceof Closure, 'default transport');
 

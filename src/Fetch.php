@@ -84,6 +84,14 @@ final class Fetch
                 . Options::DEFAULT_FILE . " is missing. Remove it from the repository (git rm) once this file is committed.\n");
         }
 
+        // An empty answer must not replace a file that still has reviews: the
+        // page would hide the rating and the count until the next fetch.
+        $kept = self::keptReviews($file, $data);
+        if ($kept > 0) {
+            fwrite($err, 'Google returned no usable reviews; keeping the existing file (' . $kept . " reviews)\n");
+            return self::EXIT_OK;
+        }
+
         try {
             $written = self::write($file, $data);
         } catch (\RuntimeException $e) {
@@ -92,6 +100,19 @@ final class Fetch
         }
         fwrite($out, ($written ? 'Written: ' : 'Unchanged (only the fetch date would differ), left as it is: ') . $file . "\n");
         return self::EXIT_OK;
+    }
+
+    /**
+     * How many reviews the existing file holds, when the new answer has none
+     * and the file has some; otherwise 0 (the file is then written as before).
+     */
+    public static function keptReviews(string $file, array $data): int
+    {
+        if ($data['reviews'] !== []) {
+            return 0;
+        }
+        $existing = Reviews::read($file);
+        return $existing === null ? 0 : count($existing['reviews']);
     }
 
     /**
