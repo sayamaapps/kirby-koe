@@ -37,7 +37,7 @@ All notable changes to this project are documented here. Versions follow
 ### Fixed
 
 - `koe-fetch` failed with `Places API answered 404` on the details call when
-  PHP's ext-curl was used (the first nightly run on a real site, mustergasthaus).
+  PHP's ext-curl was used (the first nightly run on a real site).
   The transport set `CURLOPT_POSTFIELDS` to an empty string for GET requests;
   libcurl treats any `POSTFIELDS` as "this is a POST", and
   `POST places/{id}` does not exist. GET requests now never touch the POST
