@@ -225,6 +225,10 @@ composer test                                   # or: sh tests/run.sh
 
 The tests are plain PHP scripts (exit code 0 = pass). The fetch is tested against recorded Places API answers in `tests/fixtures/`; no test needs a network or a key.
 
+## Maintenance
+
+This module is open source under the MIT license and is maintained for the author's own projects. Issues and pull requests are welcome, but there is no support promise and no release schedule. Report security problems privately through GitHub's private vulnerability reporting (the "Report a vulnerability" button on the Security tab).
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
