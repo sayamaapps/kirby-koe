@@ -32,7 +32,9 @@ final class Places
      *
      * Text search instead of a fixed place id on purpose: it survives the
      * listing being recreated. If the Google profile changes its name or
-     * address, the query must follow, otherwise nothing is found.
+     * address, the query must follow, otherwise nothing is found. Whoever
+     * wants the opposite (a different place must never be taken silently)
+     * sets the expected place id, which Fetch checks against this hit.
      *
      * @throws PlacesException when nothing is found or the API fails
      */

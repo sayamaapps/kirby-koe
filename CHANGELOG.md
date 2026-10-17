@@ -27,9 +27,21 @@ All notable changes to this project are documented here. Versions follow
   nothing).
 - A failed fetch (quota, revoked key, outage) left the file in place without
   limit. The page now hides a file that is too old, see below.
+- **Reviews of one place could appear under the profile link of another.**
+  `koe.placeId` only set the profile link, while the fetch took the first hit
+  of the text search. `koe.placeId` is now the expected place. Rendering: if it
+  differs from the `placeId` in the data file, the page shows nothing and, in
+  debug mode, the log names both ids. The fetch: see `KOE_PLACE_ID` below. The
+  README claimed the option "pins" the place; it did not, now it does.
 
 ### Added
 
+- **`KOE_PLACE_ID`** / **`--place-id=`** for `koe-fetch`, the same value as
+  `koe.placeId`. If the search or the details lead to another place, the
+  fetch exits with `1`, prints both ids and writes nothing (the details of
+  the wrong place are not even requested when the search already differs).
+  Not set: the first hit is taken, as before. The id recorded in the file is
+  the one the details name.
 - **`checkedAt`** in the data file: the day of the last *successful* fetch,
   set on every run, also when the content is unchanged. `fetchedAt` stays the
   day the content last changed. Format stays 2; the field is optional and
@@ -53,6 +65,11 @@ All notable changes to this project are documented here. Versions follow
   been committed and deployed. Run `koe-fetch` with the new version and deploy
   the file first (or in the same deploy), or raise `koe.maxAgeDays` for the
   update.
+- **`koe.placeId` can now hide the section.** A site whose option differs
+  from the place id in its data file (a typo, an old id, a deliberately
+  different profile link) shows nothing after the update. Check the `placeId`
+  in the file and set `KOE_PLACE_ID` in the workflow to the same value. A file
+  without a recorded place id (pre-1.0 format) cannot be checked and is shown.
 - **[privacy text]** `PRIVACY.md` / `DATENSCHUTZ.md`: an empty answer
   replaces the stored copy, and a stored copy is shown for at most
   `koe.maxAgeDays` after the last successful fetch.

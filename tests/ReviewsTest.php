@@ -42,6 +42,7 @@ try {
     I18n::setLanguage('en');
     expect([5, 80, 24, 3, 280, null], array_slice(array_values($rules), 0, 6), 'selection defaults are the pre-1.0 constants');
     expect(7, $rules['maxAgeDays'], 'the data file may be 7 days old by default');
+    expect(null, $rules['placeId'], 'no expected place by default');
 
     // 4 stars, too short, too old, blank text fall out.
     $out = Reviews::select([
@@ -189,6 +190,19 @@ try {
     expect([true, null], $stale(['checkedAt' => '2026-09-15'], ['maxAgeDays' => 30]), 'maxAgeDays 30 lets a 20 day old file through');
     expect(false, $stale(['checkedAt' => '2026-10-02'], ['maxAgeDays' => 2])[0], 'maxAgeDays 2 hides a 3 day old file');
     expect(false, $stale(['format' => 2, 'checkedAt' => '2026-10-02', 'reviews' => []] + ['rating' => 4.8], ['maxAgeDays' => 2])[0], 'an empty review list does not make a stale file fresh');
+
+    // Identity: with an expected place id (koe.placeId) the file must be about that place.
+    $placeFile = $tmpFile(['format' => 2, 'placeId' => 'ChIJExampleOne', 'rating' => 4.8, 'count' => 9, 'reviews' => [$r('Own', 5, '2026-09-01')]]);
+    expect(['Own'], array_column(Reviews::load($placeFile, ['placeId' => 'ChIJExampleOne'] + $rules, $today, $problem)['reviews'], 'name'), 'expected place equals the file: shown');
+    expect(null, $problem, 'expected place equals the file: no problem');
+    expect(null, Reviews::load($placeFile, ['placeId' => 'ChIJExampleTwo'] + $rules, $today, $problem), 'expected place differs from the file: nothing');
+    expect(true, str_starts_with((string) $problem, 'the data file is about place ChIJExampleOne, but koe.placeId is ChIJExampleTwo'), 'place mismatch: the reason names both ids');
+    expect(true, Reviews::load($placeFile, $rules, $today) !== null, 'no expected place: the file is taken as it is');
+    expect(null, Reviews::load($placeFile, ['placeId' => 'chijexampleone'] + $rules, $today), 'place ids are compared exactly');
+    $noId = $tmpFile(['format' => 2, 'rating' => 4.8, 'count' => 9, 'reviews' => [$r('Old copy', 5, '2026-09-01')]]);
+    expect(true, Reviews::load($noId, ['placeId' => 'ChIJExampleTwo'] + $rules, $today, $problem) !== null && $problem === null, 'a file without a recorded place id cannot be checked and is taken as it is');
+    expect(null, Reviews::load($tmpFile(['format' => 2, 'placeId' => 'ChIJExampleOne', 'checkedAt' => '2026-09-01', 'rating' => 4.8, 'count' => 9, 'reviews' => []]), ['placeId' => 'ChIJExampleOne'] + $rules, $today, $problem), 'right place but too old: still nothing');
+    expect(true, str_contains((string) $problem, 'last checked on 2026-09-01'), 'right place but too old: the reason is the age');
 
     // German month names when the language is German.
     I18n::setLanguage('de');

@@ -79,9 +79,9 @@ final class Options
      * Selection rules, each with the default that the pre-1.0 copy had as a
      * constant. `approved` is null (off) or a list of review ids. `maxAgeDays`
      * is not a selection rule but the freshness limit of the data file (at
-     * least 1 day).
+     * least 1 day), and `placeId` the expected place (null = not configured).
      *
-     * @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, maxAgeDays:int}
+     * @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, maxAgeDays:int, placeId:?string}
      */
     public static function rules(App $kirby): array
     {
@@ -94,7 +94,15 @@ final class Options
             'truncate'     => max(0, (int) self::get($kirby, 'truncate', Reviews::TRUNCATE)),
             'approved'     => is_array($approved) ? array_values(array_map('strval', $approved)) : null,
             'maxAgeDays'   => max(1, (int) self::get($kirby, 'maxAgeDays', Reviews::MAX_AGE_DAYS)),
+            'placeId'      => self::placeId($kirby),
         ];
+    }
+
+    /** `koe.placeId`, trimmed: the place the data file must be about. Null when not configured. */
+    public static function placeId(App $kirby): ?string
+    {
+        $placeId = self::get($kirby, 'placeId');
+        return is_string($placeId) && trim($placeId) !== '' ? trim($placeId) : null;
     }
 
     /**

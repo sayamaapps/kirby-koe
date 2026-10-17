@@ -51,10 +51,13 @@ final class Reviews
      * the file has none: an answer without review texts is a valid state.
      *
      * @param ?string $problem set to the reason (for the debug log) when a file
-     *                         exists and is withheld on purpose, otherwise null
+     *                         exists and is withheld on purpose (it is about
+     *                         another place than `placeId`, or too old),
+     *                         otherwise null
      * @return array{rating: float, count: int, placeId: ?string, reviews: list<array{id: ?string, name: string, rating: int, text: string, date: string, month: string, url: ?string}>, limit: int}|null
-     *         null when the file is missing, unreadable, has no rating or is
-     *         too old (`maxAgeDays`): the page then shows nothing.
+     *         null when the file is missing, unreadable, has no rating, is
+     *         about another place than `placeId` or is too old (`maxAgeDays`):
+     *         the page then shows nothing.
      */
     public static function load(string $file, array $rules = [], ?DateTimeImmutable $today = null, ?string &$problem = null): ?array
     {
@@ -65,6 +68,14 @@ final class Reviews
         }
         $rules += self::defaultRules();
         $today ??= new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
+        // The file must be about the place the site expects. A file that records
+        // no place id (the pre-1.0 format) cannot be checked and is taken as is.
+        $expected = $rules['placeId'];
+        if ($expected !== null && $data['placeId'] !== null && $data['placeId'] !== $expected) {
+            $problem = 'the data file is about place ' . $data['placeId'] . ', but koe.placeId is ' . $expected
+                . ' — fetch again with KOE_PLACE_ID set to the same id, or correct the option';
+            return null;
+        }
         $problem = self::staleReason($data, $rules['maxAgeDays'], $today);
         if ($problem !== null) {
             return null;
@@ -78,7 +89,7 @@ final class Reviews
         ];
     }
 
-    /** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, maxAgeDays:int} */
+    /** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, maxAgeDays:int, placeId:?string} */
     public static function defaultRules(): array
     {
         return [
@@ -89,6 +100,7 @@ final class Reviews
             'truncate'     => self::TRUNCATE,
             'approved'     => null,
             'maxAgeDays'   => self::MAX_AGE_DAYS,
+            'placeId'      => null,
         ];
     }
 

@@ -290,6 +290,48 @@ try {
     [$code, , $err] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty]]), ['koe-fetch'], '2026-10-11');
     expect(true, $code === Fetch::EXIT_OK && $err === '' && json_decode(file_get_contents($file), true)['reviews'] === [], 'empty answer, no file: written without notice');
 
+    // ---- The expected place (KOE_PLACE_ID / --place-id = koe.placeId) ---------
+    Fetch::write($file, $data); // a known file the failing runs must leave alone
+    $before = file_get_contents($file);
+
+    // Matching id: runs as usual.
+    [$code, $out, $err] = $run($env + [Fetch::ENV_PLACE_ID => 'ChIJTestPlace_Id0'], $ok(), ['koe-fetch'], '2026-11-02');
+    expect(Fetch::EXIT_OK, $code, 'expected place matches: exit 0 (' . $err . ')');
+    expect('ChIJTestPlace_Id0', json_decode(file_get_contents($file), true)['placeId'], 'expected place matches: file written for it');
+    file_put_contents($file, $before);
+
+    // Another place found by the search: exit 1, clear message, nothing written, no details requested.
+    $calls = [];
+    [$code, $out, $err] = $run($env + [Fetch::ENV_PLACE_ID => 'ChIJExampleOther'], $ok(), ['koe-fetch'], '2026-11-03');
+    expect(Fetch::EXIT_ERROR, $code, 'other place: exit 1');
+    expect(true, str_contains($err, 'Place id mismatch') && str_contains($err, 'KOE_PLACE_ID (koe.placeId) is ChIJExampleOther') && str_contains($err, 'Example Café (ChIJTestPlace_Id0)') && str_contains($err, 'Nothing was written'), 'other place: message names expected and found place');
+    expect(true, str_contains($err, 'KOE_QUERY') && str_contains($err, 'new Google profile'), 'other place: message says what to do');
+    expect($before, file_get_contents($file), 'other place: file untouched');
+    expect(false, str_contains($out, 'Written') || str_contains($out, 'reviews stored'), 'other place: nothing written or reported as stored');
+    expect(1, count($calls), 'other place: only the search was made, the other place\'s details are never fetched');
+    expect(false, str_contains($out . $err, $key), 'other place: key not printed');
+
+    // The argument wins over the environment; blanks count as not configured.
+    [$code, , $err] = $run($env + [Fetch::ENV_PLACE_ID => 'ChIJTestPlace_Id0'], $ok(), ['koe-fetch', '--place-id=ChIJExampleOther']);
+    expect(true, $code === Fetch::EXIT_ERROR && str_contains($err, 'is ChIJExampleOther'), '--place-id wins over KOE_PLACE_ID');
+    [$code] = $run($env + [Fetch::ENV_PLACE_ID => '  '], $ok(), ['koe-fetch'], '2026-11-03');
+    expect(Fetch::EXIT_OK, $code, 'blank KOE_PLACE_ID: not configured, fetch runs');
+    file_put_contents($file, $before);
+
+    // Search finds the expected place, but the details are about another one (renamed id): exit 1, file untouched.
+    $moved = json_decode($details, true);
+    $moved['id'] = 'ChIJExampleMoved';
+    $calls = [];
+    [$code, $out, $err] = $run($env + [Fetch::ENV_PLACE_ID => 'ChIJTestPlace_Id0'], $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => json_encode($moved)]]), ['koe-fetch'], '2026-11-04');
+    expect(Fetch::EXIT_ERROR, $code, 'details about another place: exit 1');
+    expect(true, str_contains($err, 'Place id mismatch') && str_contains($err, '(ChIJExampleMoved)'), 'details about another place: message');
+    expect($before, file_get_contents($file), 'details about another place: file untouched');
+    // Without an expected id the file is about the place the details name.
+    [$code] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => json_encode($moved)]]), ['koe-fetch'], '2026-11-04');
+    expect(['ChIJExampleMoved'], [Fetch::EXIT_OK === $code ? json_decode(file_get_contents($file), true)['placeId'] : null], 'no expected id: the id of the details is recorded');
+    file_put_contents($file, $before);
+    expect(true, str_contains(Fetch::usage(), 'KOE_PLACE_ID') && str_contains(Fetch::usage(), '--place-id='), 'usage names the new setting');
+
     // The real transport exists and uses curl when available (no request is made here).
     expect(true, Places::defaultTransport() instanceof Closure, 'default transport');
 

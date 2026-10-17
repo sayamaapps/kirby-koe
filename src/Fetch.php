@@ -16,10 +16,15 @@ use Closure;
  * (`koe.maxAgeDays`), so a fetch that found nothing new must still say it ran.
  * Failed fetches (transport, API) leave the file as it is.
  *
+ * With an expected place id (KOE_PLACE_ID, the same value as the Kirby option
+ * `koe.placeId`) the fetch stops with exit 1 and writes nothing when the search
+ * or the details are about another place. Without one, the first hit of the
+ * text search is taken, as before.
+ *
  * Exit codes, kept from the pre-1.0 script so existing workflows keep their
  * logic:
  *   0  done (file written, or already stamped today and left alone)
- *   1  error: no query, nothing found, API or write failure
+ *   1  error: no query, nothing found, other place than expected, API or write failure
  *   3  no GOOGLE_PLACES_API_KEY — "skipped", a workflow turns this into a notice
  *
  * The key is never printed. Google's error messages are scrubbed of it too.
@@ -34,13 +39,14 @@ final class Fetch
     public const ENV_QUERY = 'KOE_QUERY';
     public const ENV_FILE = 'KOE_FILE';
     public const ENV_LANGUAGE = 'KOE_LANGUAGE';
+    public const ENV_PLACE_ID = 'KOE_PLACE_ID';
 
     /** Fields that may differ between two runs without counting as a change. */
     private const VOLATILE = ['fetchedAt', 'checkedAt', 'note'];
 
     /**
      * @param array<string,string> $env       usually getenv()
-     * @param list<string>         $argv      `--query=…`, `--file=…`, `--language=…`, `--help`
+     * @param list<string>         $argv      `--query=…`, `--file=…`, `--language=…`, `--place-id=…`, `--help`
      * @param ?Closure             $transport see Places; null = the real one
      * @param string               $cwd       the project root a relative file is taken from
      * @param resource             $out
@@ -68,6 +74,7 @@ final class Fetch
             return self::EXIT_ERROR;
         }
         $language = trim((string) ($args['language'] ?? $env[self::ENV_LANGUAGE] ?? '')) ?: 'en';
+        $expectedId = trim((string) ($args['place-id'] ?? $env[self::ENV_PLACE_ID] ?? ''));
         $file = Options::resolve(trim((string) ($args['file'] ?? $env[self::ENV_FILE] ?? '')) ?: Options::DEFAULT_FILE, $cwd);
         $today ??= date('Y-m-d');
 
@@ -75,13 +82,24 @@ final class Fetch
             $places = new Places($transport ?? Places::defaultTransport(), $key);
             $place = $places->search($query, $language);
             fwrite($out, 'Found: ' . $place['name'] . ' (' . $place['id'] . ")\n");
+            if ($expectedId !== '' && $place['id'] !== $expectedId) {
+                fwrite($err, self::mismatch($expectedId, $place['id'], $query, $place['name']));
+                return self::EXIT_ERROR;
+            }
             $details = $places->details($place['id'], $language);
         } catch (PlacesException $e) {
             fwrite($err, Places::scrub($e->getMessage(), $key) . "\n");
             return self::EXIT_ERROR;
         }
 
-        ['data' => $data, 'messages' => $messages] = Places::parse($details, $place['id'], $today);
+        // The place the details are about is what the file will claim to be.
+        $placeId = trim((string) ($details['id'] ?? '')) ?: $place['id'];
+        if ($expectedId !== '' && $placeId !== $expectedId) {
+            fwrite($err, self::mismatch($expectedId, $placeId, $query, $place['name']));
+            return self::EXIT_ERROR;
+        }
+
+        ['data' => $data, 'messages' => $messages] = Places::parse($details, $placeId, $today);
         fwrite($out, implode("\n", $messages) . "\n");
 
         $legacy = Options::resolve(Options::LEGACY_FILE, $cwd);
@@ -102,6 +120,14 @@ final class Fetch
         }
         fwrite($out, ($written ? 'Written: ' : 'Unchanged (already checked today), left as it is: ') . $file . "\n");
         return self::EXIT_OK;
+    }
+
+    private static function mismatch(string $expected, string $found, string $query, string $name): string
+    {
+        return 'Place id mismatch: ' . self::ENV_PLACE_ID . ' (koe.placeId) is ' . $expected . ', but the search for "' . $query
+            . '" led to ' . ($name !== '' ? $name . ' ' : '') . '(' . $found . "). Nothing was written.\n"
+            . 'Check ' . self::ENV_QUERY . " (name and address as in the Google profile). If the business really has a new Google profile, "
+            . 'set the new place id in ' . self::ENV_PLACE_ID . " and koe.placeId.\n";
     }
 
     /**
@@ -176,7 +202,7 @@ final class Fetch
         foreach (array_slice($argv, 1) as $arg) {
             if ($arg === '-h' || $arg === '--help') {
                 $args['help'] = true;
-            } elseif (preg_match('/^--(query|file|language)=(.*)$/s', $arg, $m)) {
+            } elseif (preg_match('/^--(query|file|language|place-id)=(.*)$/s', $arg, $m)) {
                 $args[$m[1]] = $m[2];
             }
         }
@@ -186,10 +212,12 @@ final class Fetch
     public static function usage(): string
     {
         return <<<TXT
-        Usage: koe-fetch [--query="Name, Street 1, 12345 Town"] [--file=site/data/reviews.json] [--language=en]
+        Usage: koe-fetch [--query="Name, Street 1, 12345 Town"] [--file=site/data/reviews.json] [--language=en] [--place-id=ChIJ…]
 
         Environment: GOOGLE_PLACES_API_KEY (required; missing = exit 3), KOE_QUERY,
-        KOE_FILE (relative to the current directory), KOE_LANGUAGE.
+        KOE_FILE (relative to the current directory), KOE_LANGUAGE,
+        KOE_PLACE_ID (the expected place, same value as koe.placeId: another
+        place = exit 1, nothing written).
         Exit codes: 0 done, 1 error, 3 no key.
 
         TXT;

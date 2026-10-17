@@ -113,13 +113,30 @@ try {
     holds((bool) preg_match('~<time datetime="\d{4}-\d{2}-\d{2}">[A-Z][a-z]+ \d{4}</time>~', $html), 'English month and year');
     holds(str_contains($html, 'aria-label="5 out of 5 stars"'), 'stars label');
 
-    // 3. koe.placeId wins over the file; koeProfileUrl() alone.
-    [$r, $html, $kirby] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJOption']);
-    expect('https://www.google.com/maps/place/?q=place_id:ChIJOption', $r['profileUrl'], 'koe.placeId has precedence');
-    expect('https://www.google.com/maps/place/?q=place_id:ChIJOption', $kirby->site()->koeProfileUrl(), 'koeProfileUrl() from the option');
+    // 3. koe.placeId is the expected place: equal to the file it changes nothing, different it hides the section.
+    [$r, $html, $kirby] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJFromFile']);
+    expect('https://www.google.com/maps/place/?q=place_id:ChIJFromFile', $r['profileUrl'], 'koe.placeId equal to the file: profile link as before');
+    holds(count($r['reviews']) === 3, 'koe.placeId equal to the file: reviews shown');
+    expect('https://www.google.com/maps/place/?q=place_id:ChIJFromFile', $kirby->site()->koeProfileUrl(), 'koeProfileUrl() from the option');
     expect(null, (new App(['roots' => ['index' => $tmp . '/public', 'site' => $tmp . '/site', 'content' => $tmp . '/content', 'storage' => $tmp . '/storage']]))->site()->koeProfileUrl(), 'koeProfileUrl() without option and argument');
-    [$r] = $run(['koe.active' => true, 'koe.placeId' => 'bad id']);
-    expect(null, $r['profileUrl'], 'invalid koe.placeId: no profile (no fallback to the file)');
+    $idLog = $tmp . '/identity.log';
+    $previousLog = ini_set('error_log', $idLog);
+    file_put_contents($idLog, '');
+    [$r, $html] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJOption']);
+    holds($r === null && trim($html) === '', 'koe.placeId differs from the place in the file: nothing is shown (not another business under this profile link)');
+    expect('', (string) file_get_contents($idLog), 'place mismatch without debug: nothing logged');
+    [$r] = $run(['koe.active' => true, 'koe.placeId' => ' ChIJOption ', 'debug' => true]);
+    holds($r === null, 'place mismatch in debug mode: still nothing');
+    holds(str_contains((string) file_get_contents($idLog), 'koe: nothing shown: the data file is about place ChIJFromFile, but koe.placeId is ChIJOption'), 'place mismatch in debug mode: the log names both ids');
+    [$r] = $run(['koe.active' => true, 'koe.placeId' => ' ChIJFromFile ']);
+    holds($r !== null, 'koe.placeId is trimmed');
+    [$r] = $run(['koe.active' => true, 'koe.placeId' => '']);
+    holds($r !== null && $r['placeId'] === 'ChIJFromFile', 'empty koe.placeId counts as not set: the id of the file is used');
+    ini_set('error_log', (string) $previousLog);
+    // A file that records no place id (the pre-1.0 format) cannot be checked; the option then supplies the profile link.
+    $writeData($tmp . '/content/no-id.json', [$review('Anon', '-3 days')], 4.8, 5, null);
+    [$r] = $run(['koe.active' => true, 'koe.file' => 'content/no-id.json', 'koe.placeId' => 'bad id']);
+    holds($r !== null && $r['profileUrl'] === null, 'file without place id, invalid koe.placeId: shown, no profile (no fallback)');
 
     // 4. German: locale, site language option, or koe.language.
     [, $html] = $run(['koe.active' => true, 'locale' => 'de_DE.UTF-8']);
