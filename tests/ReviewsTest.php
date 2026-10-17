@@ -18,7 +18,11 @@ function expect($expected, $actual, string $what): void
     $checks++;
 }
 $files = [];
-$tmpFile = function (array $data) use (&$files): string {
+// Files carry the day of the last fetch unless a test says otherwise ($today below is 2026-10-05).
+$tmpFile = function (array $data, bool $dated = true) use (&$files): string {
+    if ($dated && !isset($data['stand'])) {
+        $data += ['fetchedAt' => '2026-10-05'];
+    }
     $file = tempnam(sys_get_temp_dir(), 'koe');
     file_put_contents($file, json_encode($data));
     return $files[] = $file;
@@ -36,7 +40,8 @@ $rules = Reviews::defaultRules();
 
 try {
     I18n::setLanguage('en');
-    expect([5, 80, 24, 3, 280, null], array_values($rules), 'defaults are the pre-1.0 constants');
+    expect([5, 80, 24, 3, 280, null], array_slice(array_values($rules), 0, 6), 'selection defaults are the pre-1.0 constants');
+    expect(7, $rules['maxAgeDays'], 'the data file may be 7 days old by default');
 
     // 4 stars, too short, too old, blank text fall out.
     $out = Reviews::select([
@@ -103,15 +108,18 @@ try {
     expect('https://www.google.com/maps/place/?q=place_id:ChIJExample-Place_ID0', Reviews::profileUrl('ChIJExample-Place_ID0'), 'profile URL');
     expect(true, Reviews::profileUrl('') === null && Reviews::profileUrl(null) === null && Reviews::profileUrl('a b"<') === null, 'profile URL without/invalid id');
 
-    // Files: missing, empty, broken, no reviews → null.
-    expect(null, Reviews::load('/does/not/exist.json', $rules, $today), 'missing file');
+    // Files: missing, empty, broken, no rating → null.
+    expect(null, Reviews::load('/does/not/exist.json', $rules, $today, $problem), 'missing file');
+    expect(null, $problem, 'missing file: no problem to report, the page is simply empty');
     expect(null, Reviews::load('', $rules, $today), 'empty path');
     $f = tempnam(sys_get_temp_dir(), 'koe');
     $files[] = $f;
     expect(null, Reviews::load($f, $rules, $today), 'empty file');
     file_put_contents($f, '{broken');
     expect(null, Reviews::load($f, $rules, $today), 'broken JSON');
-    expect(null, Reviews::load($tmpFile(['format' => 2, 'rating' => 4.8, 'count' => 9, 'reviews' => []]), $rules, $today), 'empty list');
+    // An answer without any review text is a valid state, not a broken file: rating and count are kept.
+    expect(['rating' => 4.8, 'count' => 9, 'placeId' => null, 'reviews' => [], 'limit' => 3], Reviews::load($tmpFile(['format' => 2, 'rating' => 4.8, 'count' => 9, 'reviews' => []]), $rules, $today), 'empty list: rating and count, no reviews');
+    expect(null, Reviews::load($tmpFile(['format' => 2, 'rating' => null, 'count' => 0, 'reviews' => []]), $rules, $today), 'empty list without a rating (place has no reviews at all): nothing');
     expect(null, Reviews::load($tmpFile(['format' => 2, 'count' => 9, 'reviews' => [$r('X', 5, '2026-09-01')]]), $rules, $today), 'no rating');
 
     // Format 2: rating and count only when no single review fits; place id passed through.
@@ -153,8 +161,34 @@ try {
     $n = Reviews::normalize($old);
     expect(1, $n['format'], 'legacy detected as format 1');
     expect('2026-10-04', $n['fetchedAt'], 'legacy fetch date');
-    expect(null, Reviews::normalize(['gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => []]), 'legacy empty list');
+    expect([9, []], [Reviews::normalize(['gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => []])['count'], Reviews::normalize(['gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => []])['reviews']], 'legacy empty list is a valid state too');
     expect(5, Reviews::normalize(['gesamtwertung' => 4.8, 'bewertungen' => [$legacy('A', 5, '2026-09-01'), 'junk', $legacy('B', 5, '2026-09-01'), $legacy('C', 5, '2026-09-01'), $legacy('D', 5, '2026-09-01'), $legacy('E', 5, '2026-09-01')]])['count'], 'legacy count falls back to the list length, junk ignored');
+
+    // Freshness: the day of the last successful fetch (checkedAt) decides; $today is 2026-10-05, the limit 7 days.
+    $stale = function (array $data, array $withRules = []) use ($tmpFile, $rules, $today, $r): array {
+        if (!isset($data['bewertungen'])) {
+            $data += ['format' => 2, 'rating' => 4.8, 'count' => 9, 'reviews' => [$r('Fresh', 5, '2026-09-01')]];
+        }
+        $loaded = Reviews::load($tmpFile($data, false), $withRules + $rules, $today, $problem);
+        return [$loaded !== null, $problem];
+    };
+    expect([true, null], $stale(['checkedAt' => '2026-10-05']), 'checked today: shown');
+    expect([true, null], $stale(['checkedAt' => '2026-09-28']), 'checked 7 days ago: shown (limit is inclusive)');
+    expect([false, 'the data file was last checked on 2026-09-27 (8 days ago, koe.maxAgeDays is 7)'], $stale(['checkedAt' => '2026-09-27']), 'checked 8 days ago: hidden, reason names date and limit');
+    expect([true, null], $stale(['fetchedAt' => '2026-08-01', 'checkedAt' => '2026-10-04']), 'content unchanged since August, but checked yesterday: shown (checkedAt, not fetchedAt)');
+    expect([true, null], $stale(['fetchedAt' => '2026-10-01']), 'file from before checkedAt: fetchedAt counts');
+    expect(false, $stale(['fetchedAt' => '2026-09-20'])[0], 'file from before checkedAt, fetched 15 days ago: hidden');
+    expect([true, null], $stale(['stand' => '2026-10-04', 'gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => [$legacy('Alt', 5, '2026-09-01')]]), 'format 1: stand counts as the check day');
+    expect(false, $stale(['stand' => '2026-09-01', 'gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => [$legacy('Alt', 5, '2026-09-01')]])[0], 'format 1 with an old stand: hidden');
+    [$shown, $why] = $stale([]);
+    expect(false, $shown, 'no date at all: hidden');
+    expect(true, str_contains((string) $why, 'age is unknown'), 'no date: the reason says the age is unknown');
+    expect(false, $stale(['checkedAt' => 'yesterday', 'fetchedAt' => '2026-02-30'])[0], 'unparsable dates are no dates');
+    expect([true, null], $stale(['checkedAt' => 'yesterday', 'fetchedAt' => '2026-10-03']), 'unparsable checkedAt: fetchedAt counts');
+    expect([true, null], $stale(['checkedAt' => '2026-10-06']), 'a check day in the future (clock skew) is not stale');
+    expect([true, null], $stale(['checkedAt' => '2026-09-15'], ['maxAgeDays' => 30]), 'maxAgeDays 30 lets a 20 day old file through');
+    expect(false, $stale(['checkedAt' => '2026-10-02'], ['maxAgeDays' => 2])[0], 'maxAgeDays 2 hides a 3 day old file');
+    expect(false, $stale(['format' => 2, 'checkedAt' => '2026-10-02', 'reviews' => []] + ['rating' => 4.8], ['maxAgeDays' => 2])[0], 'an empty review list does not make a stale file fresh');
 
     // German month names when the language is German.
     I18n::setLanguage('de');

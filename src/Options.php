@@ -77,9 +77,11 @@ final class Options
 
     /**
      * Selection rules, each with the default that the pre-1.0 copy had as a
-     * constant. `approved` is null (off) or a list of review ids.
+     * constant. `approved` is null (off) or a list of review ids. `maxAgeDays`
+     * is not a selection rule but the freshness limit of the data file (at
+     * least 1 day).
      *
-     * @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array}
+     * @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, maxAgeDays:int}
      */
     public static function rules(App $kirby): array
     {
@@ -91,7 +93,20 @@ final class Options
             'maxCount'     => max(0, (int) self::get($kirby, 'maxCount', Reviews::MAX_COUNT)),
             'truncate'     => max(0, (int) self::get($kirby, 'truncate', Reviews::TRUNCATE)),
             'approved'     => is_array($approved) ? array_values(array_map('strval', $approved)) : null,
+            'maxAgeDays'   => max(1, (int) self::get($kirby, 'maxAgeDays', Reviews::MAX_AGE_DAYS)),
         ];
+    }
+
+    /**
+     * Logs why nothing is shown, but only in Kirby's debug mode: on a live
+     * site a data file that is withheld on purpose must not fill the error log
+     * on every page view.
+     */
+    public static function debugLog(App $kirby, string $message): void
+    {
+        if ($kirby->option('debug') === true) {
+            error_log('koe: ' . $message);
+        }
     }
 
     /**

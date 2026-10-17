@@ -64,8 +64,9 @@ App::plugin('sayamaapps/koe', [
 
     'siteMethods' => [
         /**
-         * Overall rating, count and the selected reviews, or null (= show
-         * nothing: switched off, file missing, unreadable or empty).
+         * Overall rating, count and the selected reviews (possibly none), or
+         * null (= show nothing: switched off, file missing, unreadable or
+         * older than `koe.maxAgeDays`; the debug log says why).
          *
          *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…'|null,
          *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url'], …],
@@ -80,8 +81,11 @@ App::plugin('sayamaapps/koe', [
                 return null;
             }
             I18n::setLanguage(Options::language($kirby));
-            $result = Reviews::load(Options::file($kirby), Options::rules($kirby));
+            $result = Reviews::load(Options::file($kirby), Options::rules($kirby), null, $problem);
             if ($result === null) {
+                if ($problem !== null) {
+                    Options::debugLog($kirby, 'nothing shown: ' . $problem);
+                }
                 return null;
             }
             $result['profileUrl'] = $this->koeProfileUrl($result['placeId']);

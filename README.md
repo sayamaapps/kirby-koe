@@ -59,7 +59,9 @@ Run it from the project root. Settings come from the environment or from argumen
 | `KOE_FILE` | `--file=` | Target, relative to the current directory. Default `site/data/reviews.json`. Must match `koe.file`. |
 | `KOE_LANGUAGE` | `--language=` | Language code for the API (`de`, `en`, …), default `en`. Affects translated texts and the display name; the review text itself is always the original. |
 
-Exit codes: `0` done, `1` error (no query, nothing found, API or write failure), `3` no key. The log names the place (`Found: Name (ChIJ…)` — the place id for `koe.placeId`), lists every review with its id (for `koe.approved`), and says whether the file was written. **The file is written only when something other than the fetch date changed**, so a workflow can test with `git diff` whether to commit and deploy. The key is never printed; Google's error messages are scrubbed of it.
+Exit codes: `0` done, `1` error (no query, nothing found, API or write failure), `3` no key. The log names the place (`Found: Name (ChIJ…)` — the place id for `koe.placeId`), lists every review with its id (for `koe.approved`), and says whether the file was written. The key is never printed; Google's error messages are scrubbed of it.
+
+**What Google answers is the current state.** Every successful run replaces the file, also when the answer has no usable review (then the page shows the new rating and count without single reviews). The file records the day of the last successful run as `checkedAt`; when nothing else changed, that is the only line that differs, and a second run on the same day leaves the file alone. A workflow that commits and deploys when the file changed therefore does so every night, which is intended: the deployed file must say when it was last checked (see `maxAgeDays`). A failed run (quota, revoked key, outage) exits with `1` and leaves the file as it is; the page stops showing it once `checkedAt` is older than `koe.maxAgeDays`.
 
 The Places API returns at most five reviews per place. Reviews without text are skipped (they are counted in Google's total anyway).
 
@@ -158,6 +160,7 @@ All keys are read as `koe.<name>`, flat or nested. `null` counts as "not set".
 | `active` | `false` | Master switch. Off: `$site->koeReviews()` is `null` and the snippet prints nothing, even with a data file present. Only `true` switches on. |
 | `file` | `site/data/reviews.json` | Data file: absolute, relative to the project root (not the working directory), or a closure. Must match `KOE_FILE` of the fetch. While the default file is missing and the pre-1.0 `site/daten/bewertungen.json` exists, that one is read (and the fallback is logged). |
 | `placeId` | from the data file | Place id for the profile link and the "read all on Google" tile. The fetch records the id in the file; set the option to pin it. Without any valid id both are omitted. |
+| `maxAgeDays` | `7` | How old the last successful fetch (`checkedAt` in the data file) may be, in days, at least `1`. Older: the page shows nothing and, in Kirby's debug mode (`'debug' => true`), the PHP error log says why. Files from before `checkedAt` count by `fetchedAt`; a file without any valid date counts as too old. Not a selection rule: it is about the age of the file, not of single reviews. |
 | `minRating` | `5` | Minimum stars. |
 | `minLength` | `80` | Minimum text length in characters (after trim). |
 | `maxAgeMonths` | `24` | Maximum age, counted from today (Europe/Berlin). |
@@ -193,6 +196,7 @@ Keep the obligations: print the author, link the name to `url` when it is set (i
 {
   "format": 2,
   "fetchedAt": "2026-10-09",
+  "checkedAt": "2026-10-16",
   "note": "Replaced completely by koe-fetch on every run …",
   "placeId": "ChIJ…",
   "rating": 4.8,
@@ -204,6 +208,8 @@ Keep the obligations: print the author, link the name to `url` when it is set (i
 }
 ```
 
+`fetchedAt` is the day the content last changed, `checkedAt` the day of the last successful fetch (see `maxAgeDays`). Files written before `checkedAt` existed have only `fetchedAt` and are aged by that. `reviews` may be empty.
+
 The pre-1.0 file (`format` 1, German keys, written by `scripts/bewertungen-holen.py`) is read as well; see [Upgrading](#upgrading-from-the-bewertungen-copy).
 
 ## Upgrading from the `bewertungen` copy
@@ -211,6 +217,10 @@ The pre-1.0 file (`format` 1, German keys, written by `scripts/bewertungen-holen
 Before 1.0.0 the plugin lived as a copy named `bewertungen` in each site (`site/plugins/bewertungen/`, `scripts/bewertungen-holen.py`), with German names throughout. Options, site methods, snippet, CSS classes, environment variables and the data file were renamed; the [CHANGELOG](CHANGELOG.md#100--unreleased) has the full old → new table.
 
 No review data is lost: the plugin reads the old file at its old place (`site/daten/bewertungen.json`) until `site/data/reviews.json` exists. The first fetch after the switch writes the new file in the new format. Move the old file with `git mv site/daten/bewertungen.json site/data/reviews.json` in the switch commit so there is only one, and delete `site/plugins/bewertungen/` — while it still exists, the package logs a reminder.
+
+## Upgrading to a version with `checkedAt`
+
+Run `koe-fetch` with the new version and get the resulting file deployed before (or in the same deploy as) the new plugin. A site whose reviews have not changed for more than `koe.maxAgeDays` days has a `fetchedAt` that is already too old and no `checkedAt`; with the new plugin and the old file the section stays hidden until the next fetch is committed and deployed. Alternatively set `koe.maxAgeDays` high for the update and remove it afterwards.
 
 ## Privacy
 

@@ -35,11 +35,15 @@ site's repository, where the nightly run commits it, and on the web server,
 where the deploy puts it. The file is outside the web root and not reachable
 through the web.
 
-Every run **replaces the file completely** with the current answer. There is
-no archive: a review Google no longer returns — withdrawn by its author,
-removed by Google, pushed out by newer ones — disappears from the file and
-the page with the next run, usually within a day. This follows Google's
-requirement not to cache Places content for longer than about 24 hours. The
+Every successful run **replaces the file completely** with the current
+answer, also when that answer contains no review text (the page then shows
+only rating and count). There is no archive: a review Google no longer
+returns — withdrawn by its author, removed by Google, pushed out by newer
+ones — disappears from the file and the page with the next successful run,
+usually within a day. This follows Google's requirement not to cache Places
+content for longer than about 24 hours. If runs fail (quota, revoked key,
+outage), the file stays as it is, and the page stops showing it once the last
+successful run is older than `koe.maxAgeDays` (7 days by default). The
 repository history keeps earlier versions of the file; operators who want
 withdrawn reviews gone from history as well must handle that in git.
 
@@ -56,7 +60,8 @@ is always shown.
 The review authors are Google users whose reviews are already public on
 Google Maps. The page republishes name, date, rating and (possibly shortened)
 text of selected reviews. The nightly replacement means a review that is
-withdrawn on Google leaves the site within about a day.
+withdrawn on Google leaves the site within about a day of the next successful
+run.
 
 ## The API key
 

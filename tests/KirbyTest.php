@@ -44,9 +44,13 @@ $long = str_repeat('Friendly, competent and fast, happy to come back. ', 3);
 $review = fn (string $name, string $ago, ?string $url = null, int $rating = 5, ?string $id = null) => array_filter([
     'id' => $id, 'name' => $name, 'date' => date('Y-m-d', strtotime($ago)), 'rating' => $rating, 'text' => $long, 'source' => 'google', 'url' => $url,
 ], fn ($v) => $v !== null);
-$writeData = function (string $file, array $reviews, float $rating = 4.8, int $count = 201, ?string $placeId = 'ChIJFromFile'): void {
+/** A day relative to today, Y-m-d. */
+$day = fn (string $ago) => date('Y-m-d', strtotime($ago));
+/** Format 2 file, fetched and checked today unless $dates says otherwise (a null value leaves the key out). */
+$writeData = function (string $file, array $reviews, float $rating = 4.8, int $count = 201, ?string $placeId = 'ChIJFromFile', array $dates = []) use ($day): void {
     @mkdir(dirname($file), 0700, true);
-    file_put_contents($file, json_encode(array_filter(['format' => 2, 'placeId' => $placeId, 'rating' => $rating, 'count' => $count, 'reviews' => $reviews])));
+    $data = array_merge(['format' => 2, 'fetchedAt' => $day('now'), 'checkedAt' => $day('now'), 'placeId' => $placeId, 'rating' => $rating, 'count' => $count, 'reviews' => $reviews], $dates);
+    file_put_contents($file, json_encode(array_filter($data, fn ($v) => $v !== null)));
 };
 /** New Kirby instance with these options; returns [koeReviews(), snippet HTML (entities decoded)]. */
 $run = function (array $options, array $snippetData = [], bool $withBase = true) use ($tmp): array {
@@ -167,7 +171,7 @@ try {
     unlink($default);
     $legacy = $tmp . '/site/daten/bewertungen.json';
     mkdir(dirname($legacy), 0700, true);
-    file_put_contents($legacy, json_encode(['stand' => '2026-10-04', 'gesamtwertung' => 4.9, 'anzahl' => 77, 'bewertungen' => [
+    file_put_contents($legacy, json_encode(['stand' => $day('-1 day'), 'gesamtwertung' => 4.9, 'anzahl' => 77, 'bewertungen' => [
         ['name' => 'Alt', 'datum' => date('Y-m-d', strtotime('-15 days')), 'sterne' => 5, 'text' => $long, 'quelle' => 'google', 'link' => 'https://maps.google.com/?cid=7'],
     ]]));
     [$r, $html] = $run(['koe.active' => true, 'locale' => 'de_DE']);
@@ -186,7 +190,47 @@ try {
     ini_set('error_log', (string) $previousLog);
     holds(is_file($log) && str_contains(file_get_contents($log), 'reading the legacy data file site/daten/bewertungen.json'), 'legacy fallback is logged');
 
-    // 8. A site's own snippet wins over the package's default.
+    // 8. An answer without review texts is a valid state: rating and count stay, the list is gone.
+    $emptyFile = $tmp . '/content/empty.json';
+    $writeData($emptyFile, [], 2.0, 9);
+    [$r, $html] = $run(['koe.active' => true, 'koe.file' => $emptyFile]);
+    holds($r !== null && $r['reviews'] === [] && $r['rating'] === 2.0 && $r['count'] === 9, 'file with an empty review list: rating and count are returned');
+    holds(str_contains($html, '<strong>2.0 out of 5</strong>') && str_contains($html, '9 reviews on Google Maps') && !str_contains($html, '<ul'), 'empty review list: rating and count rendered, no list');
+    $writeData($emptyFile, [], 4.8, 201, 'ChIJFromFile', ['rating' => null]);
+    [$r, $html] = $run(['koe.active' => true, 'koe.file' => $emptyFile]);
+    holds($r === null && trim($html) === '', 'no rating at all (a place without reviews): nothing is shown');
+
+    // 9. Freshness: the last successful fetch (checkedAt) decides, not the day the content changed.
+    $freshFile = $tmp . '/content/fresh.json';
+    $freshLog = $tmp . '/fresh.log';
+    $previousLog = ini_set('error_log', $freshLog);
+    $fresh = ['koe.active' => true, 'koe.file' => $freshFile];
+    $shown = function (array $dates, array $options = []) use ($writeData, $run, $freshFile, $fresh, $review) {
+        $writeData($freshFile, [$review('Fresh', '-3 days')], 4.8, 201, 'ChIJFromFile', $dates);
+        [$r, $html] = $run($options + $fresh);
+        return $r !== null && str_contains($html, 'Fresh');
+    };
+    holds($shown(['fetchedAt' => $day('-40 days'), 'checkedAt' => $day('-1 day')]), 'content unchanged for 40 days but checked yesterday: shown');
+    holds($shown(['checkedAt' => $day('-7 days')]), 'checked 7 days ago: still shown (limit is 7)');
+    holds(!$shown(['checkedAt' => $day('-8 days')]), 'checked 8 days ago: hidden');
+    holds(!$shown(['fetchedAt' => $day('-10 days'), 'checkedAt' => null]), 'file from before checkedAt: falls back to fetchedAt, 10 days: hidden');
+    holds($shown(['fetchedAt' => $day('-3 days'), 'checkedAt' => null]), 'file from before checkedAt, 3 days: shown');
+    holds(!$shown(['fetchedAt' => null, 'checkedAt' => null]), 'no date at all: age unknown, hidden');
+    holds($shown(['checkedAt' => $day('-20 days')], ['koe.maxAgeDays' => 30]), 'koe.maxAgeDays 30: 20 days old is shown');
+    holds(!$shown(['checkedAt' => $day('-3 days')], ['koe.maxAgeDays' => 2]), 'koe.maxAgeDays 2: 3 days old is hidden');
+    holds(!$shown(['checkedAt' => $day('-2 days')], ['koe.maxAgeDays' => 0]), 'koe.maxAgeDays 0 counts as 1, never as "off"');
+    holds($shown(['checkedAt' => $day('-1 day')], ['koe' => ['maxAgeDays' => 2]]), 'nested spelling');
+    // A hidden file is explained in the log, in debug mode only.
+    $writeData($freshFile, [$review('Fresh', '-3 days')], 4.8, 201, 'ChIJFromFile', ['checkedAt' => $day('-9 days')]);
+    file_put_contents($freshLog, '');
+    [$r] = $run($fresh);
+    expect('', (string) file_get_contents($freshLog), 'stale file without debug: nothing logged');
+    [$r, $html] = $run($fresh + ['debug' => true]);
+    holds($r === null && trim($html) === '', 'stale file with debug: still nothing rendered');
+    holds(str_contains((string) file_get_contents($freshLog), 'koe: nothing shown: the data file was last checked on ' . $day('-9 days') . ' (9 days ago, koe.maxAgeDays is 7)'), 'stale file with debug: the log names the date and the limit');
+    ini_set('error_log', (string) $previousLog);
+
+    // 10. A site's own snippet wins over the package's default.
     mkdir($tmp . '/site/snippets/koe', 0700);
     file_put_contents($tmp . '/site/snippets/koe/reviews.php', '<?php $r = site()->koeReviews(); ?>OWN <?= $r === null ? "off" : count($r["reviews"]) . "/" . $r["limit"] ?>');
     [, $html] = $run(['koe.active' => true]);
