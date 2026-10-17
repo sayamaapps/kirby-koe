@@ -36,6 +36,16 @@ All notable changes to this project are documented here. Versions follow
 
 ### Added
 
+- **A notice on the selection in the default snippet.** Google's Places
+  policies ask for a clear notice on how reviews are ordered and filtered; the
+  snippet said nothing. It now prints `<p class="koe-notice">` below the single
+  reviews, worded from the options in force (`minRating`, `minLength`,
+  `maxAgeMonths`, `approved`, `maxCount`, newest first), in English or German
+  (`koe.notice.*` translations). Not a fixed label: it changes with the
+  configuration. Also in the result of `$site->koeReviews()` as `notice`; own
+  snippets should print it. The default selection rules are unchanged. Sites
+  with their own `site/snippets/koe/reviews.php` get no notice until they print
+  `$r['notice']`.
 - **`KOE_PLACE_ID`** / **`--place-id=`** for `koe-fetch`, the same value as
   `koe.placeId`. If the search or the details lead to another place, the
   fetch exits with `1`, prints both ids and writes nothing (the details of

@@ -13,8 +13,10 @@
  * is text; with it, the official, unaltered logo served from your own site.
  *
  * Rating and count are always shown; empty slots are filled by a "read all
- * on Google" tile. With the module off or the file empty, the section is
- * omitted entirely. Deliberately no structured data: Google ignores review
+ * on Google" tile. Below the single reviews a notice says how they were
+ * selected and sorted (Google Places policies); it is worded from the options
+ * in force. With the module off or no usable file, the section is omitted
+ * entirely. Deliberately no structured data: Google ignores review
  * markup a business publishes about itself. No CSS: the grid belongs to the
  * site (classes koe-*).
  *
@@ -53,5 +55,6 @@ $tab = '<span class="sr-only"> ' . esc($t('opensNewTab')) . '</span>';
     </li>
     <?php endif ?>
   </ul>
+  <p class="koe-notice"><?= esc($r['notice']) ?></p>
   <?php endif ?>
 </section>

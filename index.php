@@ -71,10 +71,13 @@ App::plugin('sayamaapps/koe', [
          *
          *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…'|null,
          *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url'], …],
-         *    'limit' => 3, 'profileUrl' => 'https://…'|null]
+         *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…']
          *
          * `limit` is the configured maximum: a snippet fills the remaining
          * slots with a "read all on Google" tile when count(reviews) < limit.
+         * `notice` tells visitors how the reviews were selected and sorted,
+         * worded from the options in force (plain text, in the snippet's
+         * language); a snippet that lists single reviews prints it.
          */
         'koeReviews' => function (): ?array {
             $kirby = $this->kirby();
@@ -82,13 +85,15 @@ App::plugin('sayamaapps/koe', [
                 return null;
             }
             I18n::setLanguage(Options::language($kirby));
-            $result = Reviews::load(Options::file($kirby), Options::rules($kirby), null, $problem);
+            $rules = Options::rules($kirby);
+            $result = Reviews::load(Options::file($kirby), $rules, null, $problem);
             if ($result === null) {
                 if ($problem !== null) {
                     Options::debugLog($kirby, 'nothing shown: ' . $problem);
                 }
                 return null;
             }
+            $result['notice'] = Reviews::notice($rules);
             $result['profileUrl'] = $this->koeProfileUrl($result['placeId']);
             return $result;
         },

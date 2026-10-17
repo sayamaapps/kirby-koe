@@ -247,7 +247,25 @@ try {
     holds(str_contains((string) file_get_contents($freshLog), 'koe: nothing shown: the data file was last checked on ' . $day('-9 days') . ' (9 days ago, koe.maxAgeDays is 7)'), 'stale file with debug: the log names the date and the limit');
     ini_set('error_log', (string) $previousLog);
 
-    // 10. A site's own snippet wins over the package's default.
+    // 10. The default snippet tells visitors how the reviews were selected and sorted, worded from the options.
+    $writeData($default, [$review('Notice', '-3 days', null, 5, 'id-notice')], 4.8, 201);
+    $noticeOf = fn (string $html) => preg_match('~<p class="koe-notice">(.*?)</p>~s', $html, $m) ? $m[1] : null;
+    $defaultEn = 'Selection of the reviews shown: 5 stars, at least 80 characters of text, not older than 24 months. Newest first, at most 3. The rating and the number of reviews refer to all reviews on Google.';
+    [$r, $html] = $run(['koe.active' => true]);
+    expect($defaultEn, $noticeOf($html), 'default snippet: notice for the default options');
+    expect($defaultEn, $r['notice'], 'koeReviews() hands the notice to own snippets as well');
+    holds(strpos($html, 'koe-notice') > strpos($html, '</ul>'), 'the notice stands below the reviews');
+    [, $html] = $run(['koe.active' => true, 'koe.minRating' => 4, 'koe.minLength' => 120, 'koe.maxAgeMonths' => 12, 'koe.maxCount' => 2]);
+    expect('Selection of the reviews shown: at least 4 stars, at least 120 characters of text, not older than 12 months. Newest first, at most 2. The rating and the number of reviews refer to all reviews on Google.', $noticeOf($html), 'notice follows the options');
+    [, $html] = $run(['koe' => ['active' => true, 'approved' => ['id-notice'], 'minRating' => 3]]);
+    holds(str_contains((string) $noticeOf($html), 'at least 3 stars, at least 80 characters of text, not older than 24 months, approved by the business.'), 'notice names the approved list; nested spelling');
+    [, $html] = $run(['koe.active' => true, 'locale' => 'de_DE']);
+    expect('Auswahl der angezeigten Bewertungen: 5 Sterne, mindestens 80 Zeichen Text, nicht älter als 24 Monate. Neueste zuerst, höchstens 3. Gesamtbewertung und Anzahl beziehen sich auf alle Bewertungen bei Google.', $noticeOf($html), 'German notice');
+    [, $html] = $run(['koe.active' => true, 'koe.approved' => []]);
+    holds($noticeOf($html) === null && str_contains($html, '4.8 out of 5'), 'no single review shown: no notice about their selection');
+    holds(!str_contains(file_get_contents($base . '/snippets/reviews.php'), 'at least 80'), 'the snippet itself carries no fixed rule text');
+
+    // 11. A site's own snippet wins over the package's default.
     mkdir($tmp . '/site/snippets/koe', 0700);
     file_put_contents($tmp . '/site/snippets/koe/reviews.php', '<?php $r = site()->koeReviews(); ?>OWN <?= $r === null ? "off" : count($r["reviews"]) . "/" . $r["limit"] ?>');
     [, $html] = $run(['koe.active' => true]);

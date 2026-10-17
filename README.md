@@ -6,7 +6,7 @@ Google reviews for [Kirby CMS](https://getkirby.com) 5, served from your own ser
 
 - **Server-side copy.** A small CLI (`koe-fetch`) reads the place once a night through the Places API (New) and writes one JSON file into the site. The page renders from that file.
 - **No request to Google from the visitor.** No script, no embed, no font, no image from Google. The "Google Maps" logo, if shown, is served from your own site. Links to the reviews open on Google only when clicked.
-- **Rule-based selection.** By default only five-star reviews with at least 80 characters, not older than 24 months, the three newest, cut at 280 characters. Optionally a list of approved review ids, so the business decides what is shown.
+- **Rule-based selection.** By default only five-star reviews with at least 80 characters, not older than 24 months, the three newest, cut at 280 characters. Optionally a list of approved review ids, so the business decides what is shown. The default snippet tells visitors how the reviews shown were selected and sorted (see [Notice on the selection](#notice-on-the-selection)).
 - **Follows the Places policies.** Author named and linked to the review on Google Maps, "Google Maps" attribution, nothing cached for longer than about a day: every run replaces the file completely, there is no archive.
 - **The API key never reaches the website.** It lives only where the fetch runs (a repository secret, a cron environment).
 - **English and German.** The default snippet follows the site's language.
@@ -175,6 +175,14 @@ All keys are read as `koe.<name>`, flat or nested. `null` counts as "not set".
 
 The strings of the default snippet are also registered as Kirby translations (`t('koe.readAll')`), and `koe_option('name', $default)` reads an option from a site snippet.
 
+### Notice on the selection
+
+Google's Places policies ask for a clear notice on how reviews are filtered and ordered. The default snippet prints one below the single reviews (`<p class="koe-notice">`), built from the options actually in force, so it cannot go out of date when the configuration changes. With the defaults it reads (German sites get the German text):
+
+> Selection of the reviews shown: 5 stars, at least 80 characters of text, not older than 24 months. Newest first, at most 3. The rating and the number of reviews refer to all reviews on Google.
+
+It names `minRating` (not when it is `1`, which filters nothing), `minLength` (not when `0`), `maxAgeMonths`, an `approved` list ("approved by the business"), the order (newest first) and `maxCount`. Rating and count are Google's totals, which the last sentence says. There is no notice when no single review is shown. It cannot be switched off; for other wording use your own snippet. The text is also in `$r['notice']` (see below). The strings are the Kirby translations `koe.notice.*`.
+
 ### Your own markup
 
 Create `site/snippets/koe/reviews.php` (Kirby takes it before the package's snippet), or any snippet that calls the site method:
@@ -183,12 +191,13 @@ Create `site/snippets/koe/reviews.php` (Kirby takes it before the package's snip
 $r = site()->koeReviews();   // null = show nothing
 // ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…'|null, 'limit' => 3,
 //  'profileUrl' => 'https://www.google.com/maps/place/?q=place_id:…'|null,
+//  'notice' => 'Selection of the reviews shown: 5 stars, …',
 //  'reviews' => [['id' => 'ChdD…'|null, 'name' => 'Anna B.', 'rating' => 5,
 //                 'text' => '…', 'date' => '2026-07-14', 'month' => 'July 2026',
 //                 'url' => 'https://www.google.com/maps/reviews/…'|null], …]]
 ```
 
-Keep the obligations: print the author, link the name to `url` when it is set (it is `null` unless it is an `http(s)` address), show the attribution, and fill empty slots with a link to all reviews (`count($r['reviews']) < $r['limit']`). `$site->koeProfileUrl()` returns the profile address from `koe.placeId` alone. `koeReviews()` is `null` when `koe.placeId` names another place than the data file.
+Keep the obligations: print the author, link the name to `url` when it is set (it is `null` unless it is an `http(s)` address), show the attribution, print `$r['notice']` where single reviews are listed, and fill empty slots with a link to all reviews (`count($r['reviews']) < $r['limit']`). `$site->koeProfileUrl()` returns the profile address from `koe.placeId` alone. `koeReviews()` is `null` when `koe.placeId` names another place than the data file.
 
 ## Data file
 

@@ -242,6 +242,43 @@ final class Reviews
     }
 
     /**
+     * The notice for visitors: how the reviews shown were selected and in what
+     * order, worded from the rules actually in force (never a fixed text, so it
+     * cannot say "5 stars" on a site that lets 4 stars in). Plain text in the
+     * current language (I18n), to be escaped by the template.
+     *
+     * Covers the rules that decide which reviews appear: stars, text length,
+     * age, an approved list, the order and the maximum number. The rating and
+     * the count are Google's totals; the notice says so.
+     */
+    public static function notice(array $rules): string
+    {
+        $rules += self::defaultRules();
+        $criteria = [];
+        if ($rules['minRating'] >= 5) {
+            $criteria[] = I18n::t('notice.stars.exact', ['stars' => 5]);
+        } elseif ($rules['minRating'] > 1) {
+            $criteria[] = I18n::t('notice.stars.min', ['stars' => $rules['minRating']]);
+        }
+        if ($rules['minLength'] > 0) {
+            $criteria[] = $rules['minLength'] === 1
+                ? I18n::t('notice.length.one')
+                : I18n::t('notice.length', ['chars' => $rules['minLength']]);
+        }
+        $criteria[] = $rules['maxAgeMonths'] === 1
+            ? I18n::t('notice.age.one')
+            : I18n::t('notice.age', ['months' => $rules['maxAgeMonths']]);
+        if ($rules['approved'] !== null) {
+            $criteria[] = I18n::t('notice.approved');
+        }
+        return implode(' ', [
+            I18n::t('notice.selection', ['criteria' => implode(', ', $criteria)]),
+            I18n::t('notice.order', ['count' => $rules['maxCount']]),
+            I18n::t('notice.totals'),
+        ]);
+    }
+
+    /**
      * Address of the Google profile from the place id (the place id may be
      * stored). Without one, or with a nonsensical one, null: then the profile
      * link and the "read all on Google" tile are omitted.
