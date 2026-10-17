@@ -69,6 +69,7 @@ try {
     ['data' => $data, 'messages' => $messages] = Places::parse(json_decode($details, true), 'ChIJTestPlace_Id0', '2026-10-05');
     expect(2, $data['format'], 'format 2');
     expect('2026-10-05', $data['fetchedAt'], 'fetch date');
+    expect('2026-10-05', $data['checkedAt'], 'check date = fetch date of this run');
     expect('ChIJTestPlace_Id0', $data['placeId'], 'place id stored');
     expect([4.8, 201], [$data['rating'], $data['count']], 'rating and count from Google');
     expect(4, count($data['reviews']), 'four of five stored (one has no text)');
@@ -149,24 +150,46 @@ try {
     expect(true, str_contains($out, 'Written: ' . $file), 'success: written line');
     expect(true, is_file($file), 'success: default file site/data/reviews.json created with its directory');
     $written = json_decode(file_get_contents($file), true);
-    expect([2, '2026-10-05', 'ChIJTestPlace_Id0', 4], [$written['format'], $written['fetchedAt'], $written['placeId'], count($written['reviews'])], 'success: file content');
+    expect([2, '2026-10-05', '2026-10-05', 'ChIJTestPlace_Id0', 4], [$written['format'], $written['fetchedAt'], $written['checkedAt'], $written['placeId'], count($written['reviews'])], 'success: file content');
+    expect(['format', 'fetchedAt', 'checkedAt', 'note', 'placeId', 'rating', 'count', 'reviews'], array_keys($written), 'success: checkedAt sits right after fetchedAt');
     expect(true, str_contains(file_get_contents($file), 'Wunderschönes Café'), 'success: unicode unescaped');
     expect('en', json_decode($calls[0]['body'], true)['languageCode'], 'language defaults to en');
     expect(false, str_contains($out . $err, $key), 'success: key not printed');
 
-    // Same answer the next day: nothing but the date would change → untouched.
+    // Same answer on the same day: nothing would change → untouched.
     $before = file_get_contents($file);
+    [$code, $out] = $run($env, $ok());
+    expect(true, $code === Fetch::EXIT_OK && str_contains($out, 'Unchanged'), 'same day, same content: exit 0, says unchanged');
+    expect($before, file_get_contents($file), 'same day, same content: file byte-identical');
+
+    // Same answer the next day: the content is unchanged, but the fetch ran — checkedAt moves, nothing else.
     [$code, $out] = $run($env, $ok(), ['koe-fetch'], '2026-10-06');
-    expect(Fetch::EXIT_OK, $code, 'unchanged: exit 0');
-    expect(true, str_contains($out, 'Unchanged'), 'unchanged: says so');
-    expect($before, file_get_contents($file), 'unchanged: file byte-identical, fetch date kept');
+    expect(Fetch::EXIT_OK, $code, 'next day, same content: exit 0');
+    expect(true, str_contains($out, 'Written: '), 'next day, same content: the file is written for the new check day');
+    $after = json_decode(file_get_contents($file), true);
+    expect(['2026-10-05', '2026-10-06'], [$after['fetchedAt'], $after['checkedAt']], 'next day: fetchedAt (content last changed) kept, checkedAt moved');
+    expect(str_replace('"checkedAt": "2026-10-05"', '"checkedAt": "2026-10-06"', $before), file_get_contents($file), 'next day: exactly one line differs');
+    $afterBytes = file_get_contents($file);
+    [$code, $out] = $run($env, $ok(), ['koe-fetch'], '2026-10-06');
+    expect(true, $code === 0 && str_contains($out, 'Unchanged') && $afterBytes === file_get_contents($file), 'a second run on that day leaves the file alone');
+
+    // A file from before checkedAt, same content: gets checkedAt, keeps its fetchedAt and the rest.
+    $oldFormat = json_decode($before, true);
+    unset($oldFormat['checkedAt']);
+    file_put_contents($file, json_encode($oldFormat, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n");
+    [$code, $out] = $run($env, $ok(), ['koe-fetch'], '2026-10-05');
+    $upgraded = json_decode(file_get_contents($file), true);
+    expect(true, $code === 0 && str_contains($out, 'Written: '), 'file without checkedAt: written once');
+    expect(['2026-10-05', '2026-10-05', 4], [$upgraded['fetchedAt'], $upgraded['checkedAt'], count($upgraded['reviews'])], 'file without checkedAt: stamped, content kept');
+    expect(false, array_key_exists('checkedAt', Fetch::comparable($upgraded)), 'checkedAt does not count as a content change');
+    file_put_contents($file, $before);
 
     // A new review → written again.
     $more = json_decode($details, true);
     $more['userRatingCount'] = 202;
     [$code, $out] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => json_encode($more)]]), ['koe-fetch'], '2026-10-07');
     expect(true, $code === 0 && str_contains($out, 'Written:'), 'changed count: written');
-    expect(['2026-10-07', 202], [json_decode(file_get_contents($file), true)['fetchedAt'], json_decode(file_get_contents($file), true)['count']], 'changed count: new date and count');
+    expect(['2026-10-07', '2026-10-07', 202], [json_decode(file_get_contents($file), true)['fetchedAt'], json_decode(file_get_contents($file), true)['checkedAt'], json_decode(file_get_contents($file), true)['count']], 'changed count: new dates and count');
 
     // A format 1 file at the target (git mv in the switch PR) is replaced by format 2.
     file_put_contents($file, json_encode(['stand' => '2026-10-01', 'gesamtwertung' => 4.8, 'anzahl' => 201, 'bewertungen' => [['name' => 'Anna Beispiel', 'datum' => '2026-07-14', 'sterne' => 5, 'text' => 'x', 'quelle' => 'google']]]));
@@ -177,9 +200,9 @@ try {
     $legacy = $tmp . '/' . Options::LEGACY_FILE;
     mkdir(dirname($legacy), 0700, true);
     file_put_contents($legacy, '{}');
-    [$code, $out] = $run($env, $ok(), ['koe-fetch'], '2026-10-08');
+    [$code, $out] = $run($env, $ok());
     expect(true, $code === 0 && str_contains($out, 'legacy file site/daten/bewertungen.json still exists'), 'legacy file is pointed out');
-    expect(true, str_contains($out, 'Unchanged'), 'legacy note does not change the outcome (same content → left alone)');
+    expect(true, str_contains($out, 'Unchanged'), 'legacy note does not change the outcome (same content, same day → left alone)');
     unlink($legacy);
 
     // --file and KOE_FILE: relative to the working directory, or absolute; --language passed on.
@@ -218,29 +241,96 @@ try {
         chmod($locked, 0700);
     }
 
-    // Empty answer, file with two reviews: the file stays, exit 0, one line on STDERR.
+    // Empty answer, file with two reviews: a successful answer is the current state — the file is replaced.
     $two = $data;
     $two['reviews'] = array_slice($data['reviews'], 0, 2);
     expect(true, Fetch::write($file, $two), 'setup: two-review file written');
-    $before = file_get_contents($file);
-    $empty = json_encode(['id' => 'ChIJTestPlace_Id0', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => []]);
+    $empty = json_encode(['id' => 'ChIJTestPlace_Id0', 'rating' => 2.0, 'userRatingCount' => 9, 'reviews' => []]);
     [$code, $out, $err] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty]]), ['koe-fetch'], '2026-10-11');
+    $replaced = json_decode(file_get_contents($file), true);
     expect(Fetch::EXIT_OK, $code, 'empty answer: exit 0');
-    expect($before, file_get_contents($file), 'empty answer: existing file untouched');
-    expect("Google returned no usable reviews; keeping the existing file (2 reviews)\n", $err, 'empty answer: one line on STDERR');
-    expect(false, str_contains($out, 'Written:'), 'empty answer: nothing written');
+    expect([[], 2.0, 9], [$replaced['reviews'], (float) $replaced['rating'], $replaced['count']], 'empty answer: old reviews, rating and count are gone');
+    expect(['2026-10-11', '2026-10-11'], [$replaced['fetchedAt'], $replaced['checkedAt']], 'empty answer: the file is dated');
+    expect(true, str_contains($out, 'Written: ') && str_contains($out, 'no usable reviews; that is the current state'), 'empty answer: written, and the log says what happened');
+    expect('', $err, 'empty answer: nothing on STDERR');
+    expect(false, str_contains(file_get_contents($file), 'Anna Beispiel'), 'empty answer: no withdrawn review text is left in the file');
+    // The page reads it as rating and count without single reviews.
+    $shownNow = Koe\Reviews::load($file, [], new DateTimeImmutable('2026-10-12', new DateTimeZone('Europe/Berlin')));
+    expect([2.0, 9, []], [$shownNow['rating'], $shownNow['count'], $shownNow['reviews']], 'empty answer: the page gets the new rating and count');
+
+    // The same empty answer next day: rating, count and reviews are unchanged, only checkedAt moves (not "unchanged forever").
+    [$code, $out] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty]]), ['koe-fetch'], '2026-10-12');
+    $again = json_decode(file_get_contents($file), true);
+    expect(true, $code === 0 && str_contains($out, 'Written: '), 'empty answer again: written for the new check day');
+    expect(['2026-10-11', '2026-10-12', 2.0], [$again['fetchedAt'], $again['checkedAt'], (float) $again['rating']], 'empty answer again: content date kept, check date moved');
+    // A different rating with still no reviews is a change.
+    $empty2 = json_encode(['id' => 'ChIJTestPlace_Id0', 'rating' => 2.5, 'userRatingCount' => 10, 'reviews' => []]);
+    [$code, $out] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty2]]), ['koe-fetch'], '2026-10-12');
+    $changed = json_decode(file_get_contents($file), true);
+    expect([2.5, 10, '2026-10-12'], [$changed['rating'], $changed['count'], $changed['fetchedAt']], 'empty list, new rating and count: written, content date moves');
+
+    // An answer without rating (place without any review): written as the current state, with rating null.
+    $nothing = json_encode(['id' => 'ChIJTestPlace_Id0']);
+    [$code] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $nothing]]), ['koe-fetch'], '2026-10-13');
+    $bare = json_decode(file_get_contents($file), true);
+    expect([Fetch::EXIT_OK, null, 0, []], [$code, $bare['rating'], $bare['count'], $bare['reviews']], 'answer without rating and reviews: replaced');
+    expect(null, Koe\Reviews::read($file), 'a file without rating is not readable for the page (nothing shown)');
+    [$code, $out] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $nothing]]), ['koe-fetch'], '2026-10-13');
+    expect(true, $code === 0 && str_contains($out, 'Unchanged'), 'the same bare answer on the same day is left alone');
+
+    // Failed fetches leave the file exactly as it is — checkedAt included, so the page can age it out.
+    $before = file_get_contents($file);
+    foreach (['quota' => [['status' => 429, 'body' => '{}']], 'network' => [new RuntimeException('timeout')]] as $what => $script) {
+        [$code] = $run($env, $transport($script), ['koe-fetch'], '2026-10-20');
+        expect(true, $code === Fetch::EXIT_ERROR && $before === file_get_contents($file), "$what after a good run: file and checkedAt untouched");
+    }
 
     // Empty answer, no file: written, with an empty review list.
     unlink($file);
     [$code, , $err] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty]]), ['koe-fetch'], '2026-10-11');
     expect(true, $code === Fetch::EXIT_OK && $err === '' && json_decode(file_get_contents($file), true)['reviews'] === [], 'empty answer, no file: written without notice');
 
-    // Empty answer, file without reviews: the guard does not apply (no notice, exit 0), the write rule is unchanged.
-    $none = $data;
-    $none['reviews'] = [];
-    Fetch::write($file, $none);
-    [$code, , $err] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => $empty]]), ['koe-fetch'], '2026-10-12');
-    expect(true, $code === Fetch::EXIT_OK && $err === '', 'empty answer, file without reviews: no notice');
+    // ---- The expected place (KOE_PLACE_ID / --place-id = koe.placeId) ---------
+    Fetch::write($file, $data); // a known file the failing runs must leave alone
+    $before = file_get_contents($file);
+
+    // Matching id: runs as usual.
+    [$code, $out, $err] = $run($env + [Fetch::ENV_PLACE_ID => 'ChIJTestPlace_Id0'], $ok(), ['koe-fetch'], '2026-11-02');
+    expect(Fetch::EXIT_OK, $code, 'expected place matches: exit 0 (' . $err . ')');
+    expect('ChIJTestPlace_Id0', json_decode(file_get_contents($file), true)['placeId'], 'expected place matches: file written for it');
+    file_put_contents($file, $before);
+
+    // Another place found by the search: exit 1, clear message, nothing written, no details requested.
+    $calls = [];
+    [$code, $out, $err] = $run($env + [Fetch::ENV_PLACE_ID => 'ChIJExampleOther'], $ok(), ['koe-fetch'], '2026-11-03');
+    expect(Fetch::EXIT_ERROR, $code, 'other place: exit 1');
+    expect(true, str_contains($err, 'Place id mismatch') && str_contains($err, 'KOE_PLACE_ID (koe.placeId) is ChIJExampleOther') && str_contains($err, 'Example Café (ChIJTestPlace_Id0)') && str_contains($err, 'Nothing was written'), 'other place: message names expected and found place');
+    expect(true, str_contains($err, 'KOE_QUERY') && str_contains($err, 'new Google profile'), 'other place: message says what to do');
+    expect($before, file_get_contents($file), 'other place: file untouched');
+    expect(false, str_contains($out, 'Written') || str_contains($out, 'reviews stored'), 'other place: nothing written or reported as stored');
+    expect(1, count($calls), 'other place: only the search was made, the other place\'s details are never fetched');
+    expect(false, str_contains($out . $err, $key), 'other place: key not printed');
+
+    // The argument wins over the environment; blanks count as not configured.
+    [$code, , $err] = $run($env + [Fetch::ENV_PLACE_ID => 'ChIJTestPlace_Id0'], $ok(), ['koe-fetch', '--place-id=ChIJExampleOther']);
+    expect(true, $code === Fetch::EXIT_ERROR && str_contains($err, 'is ChIJExampleOther'), '--place-id wins over KOE_PLACE_ID');
+    [$code] = $run($env + [Fetch::ENV_PLACE_ID => '  '], $ok(), ['koe-fetch'], '2026-11-03');
+    expect(Fetch::EXIT_OK, $code, 'blank KOE_PLACE_ID: not configured, fetch runs');
+    file_put_contents($file, $before);
+
+    // Search finds the expected place, but the details are about another one (renamed id): exit 1, file untouched.
+    $moved = json_decode($details, true);
+    $moved['id'] = 'ChIJExampleMoved';
+    $calls = [];
+    [$code, $out, $err] = $run($env + [Fetch::ENV_PLACE_ID => 'ChIJTestPlace_Id0'], $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => json_encode($moved)]]), ['koe-fetch'], '2026-11-04');
+    expect(Fetch::EXIT_ERROR, $code, 'details about another place: exit 1');
+    expect(true, str_contains($err, 'Place id mismatch') && str_contains($err, '(ChIJExampleMoved)'), 'details about another place: message');
+    expect($before, file_get_contents($file), 'details about another place: file untouched');
+    // Without an expected id the file is about the place the details name.
+    [$code] = $run($env, $transport([['status' => 200, 'body' => $search], ['status' => 200, 'body' => json_encode($moved)]]), ['koe-fetch'], '2026-11-04');
+    expect(['ChIJExampleMoved'], [Fetch::EXIT_OK === $code ? json_decode(file_get_contents($file), true)['placeId'] : null], 'no expected id: the id of the details is recorded');
+    file_put_contents($file, $before);
+    expect(true, str_contains(Fetch::usage(), 'KOE_PLACE_ID') && str_contains(Fetch::usage(), '--place-id='), 'usage names the new setting');
 
     // The real transport exists and uses curl when available (no request is made here).
     expect(true, Places::defaultTransport() instanceof Closure, 'default transport');

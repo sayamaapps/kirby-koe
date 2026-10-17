@@ -44,9 +44,13 @@ $long = str_repeat('Friendly, competent and fast, happy to come back. ', 3);
 $review = fn (string $name, string $ago, ?string $url = null, int $rating = 5, ?string $id = null) => array_filter([
     'id' => $id, 'name' => $name, 'date' => date('Y-m-d', strtotime($ago)), 'rating' => $rating, 'text' => $long, 'source' => 'google', 'url' => $url,
 ], fn ($v) => $v !== null);
-$writeData = function (string $file, array $reviews, float $rating = 4.8, int $count = 201, ?string $placeId = 'ChIJFromFile'): void {
+/** A day relative to today, Y-m-d. */
+$day = fn (string $ago) => date('Y-m-d', strtotime($ago));
+/** Format 2 file, fetched and checked today unless $dates says otherwise (a null value leaves the key out). */
+$writeData = function (string $file, array $reviews, float $rating = 4.8, int $count = 201, ?string $placeId = 'ChIJFromFile', array $dates = []) use ($day): void {
     @mkdir(dirname($file), 0700, true);
-    file_put_contents($file, json_encode(array_filter(['format' => 2, 'placeId' => $placeId, 'rating' => $rating, 'count' => $count, 'reviews' => $reviews])));
+    $data = array_merge(['format' => 2, 'fetchedAt' => $day('now'), 'checkedAt' => $day('now'), 'placeId' => $placeId, 'rating' => $rating, 'count' => $count, 'reviews' => $reviews], $dates);
+    file_put_contents($file, json_encode(array_filter($data, fn ($v) => $v !== null)));
 };
 /** New Kirby instance with these options; returns [koeReviews(), snippet HTML (entities decoded)]. */
 $run = function (array $options, array $snippetData = [], bool $withBase = true) use ($tmp): array {
@@ -109,13 +113,30 @@ try {
     holds((bool) preg_match('~<time datetime="\d{4}-\d{2}-\d{2}">[A-Z][a-z]+ \d{4}</time>~', $html), 'English month and year');
     holds(str_contains($html, 'aria-label="5 out of 5 stars"'), 'stars label');
 
-    // 3. koe.placeId wins over the file; koeProfileUrl() alone.
-    [$r, $html, $kirby] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJOption']);
-    expect('https://www.google.com/maps/place/?q=place_id:ChIJOption', $r['profileUrl'], 'koe.placeId has precedence');
-    expect('https://www.google.com/maps/place/?q=place_id:ChIJOption', $kirby->site()->koeProfileUrl(), 'koeProfileUrl() from the option');
+    // 3. koe.placeId is the expected place: equal to the file it changes nothing, different it hides the section.
+    [$r, $html, $kirby] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJFromFile']);
+    expect('https://www.google.com/maps/place/?q=place_id:ChIJFromFile', $r['profileUrl'], 'koe.placeId equal to the file: profile link as before');
+    holds(count($r['reviews']) === 3, 'koe.placeId equal to the file: reviews shown');
+    expect('https://www.google.com/maps/place/?q=place_id:ChIJFromFile', $kirby->site()->koeProfileUrl(), 'koeProfileUrl() from the option');
     expect(null, (new App(['roots' => ['index' => $tmp . '/public', 'site' => $tmp . '/site', 'content' => $tmp . '/content', 'storage' => $tmp . '/storage']]))->site()->koeProfileUrl(), 'koeProfileUrl() without option and argument');
-    [$r] = $run(['koe.active' => true, 'koe.placeId' => 'bad id']);
-    expect(null, $r['profileUrl'], 'invalid koe.placeId: no profile (no fallback to the file)');
+    $idLog = $tmp . '/identity.log';
+    $previousLog = ini_set('error_log', $idLog);
+    file_put_contents($idLog, '');
+    [$r, $html] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJOption']);
+    holds($r === null && trim($html) === '', 'koe.placeId differs from the place in the file: nothing is shown (not another business under this profile link)');
+    expect('', (string) file_get_contents($idLog), 'place mismatch without debug: nothing logged');
+    [$r] = $run(['koe.active' => true, 'koe.placeId' => ' ChIJOption ', 'debug' => true]);
+    holds($r === null, 'place mismatch in debug mode: still nothing');
+    holds(str_contains((string) file_get_contents($idLog), 'koe: nothing shown: the data file is about place ChIJFromFile, but koe.placeId is ChIJOption'), 'place mismatch in debug mode: the log names both ids');
+    [$r] = $run(['koe.active' => true, 'koe.placeId' => ' ChIJFromFile ']);
+    holds($r !== null, 'koe.placeId is trimmed');
+    [$r] = $run(['koe.active' => true, 'koe.placeId' => '']);
+    holds($r !== null && $r['placeId'] === 'ChIJFromFile', 'empty koe.placeId counts as not set: the id of the file is used');
+    ini_set('error_log', (string) $previousLog);
+    // A file that records no place id (the pre-1.0 format) cannot be checked; the option then supplies the profile link.
+    $writeData($tmp . '/content/no-id.json', [$review('Anon', '-3 days')], 4.8, 5, null);
+    [$r] = $run(['koe.active' => true, 'koe.file' => 'content/no-id.json', 'koe.placeId' => 'bad id']);
+    holds($r !== null && $r['profileUrl'] === null, 'file without place id, invalid koe.placeId: shown, no profile (no fallback)');
 
     // 4. German: locale, site language option, or koe.language.
     [, $html] = $run(['koe.active' => true, 'locale' => 'de_DE.UTF-8']);
@@ -167,7 +188,7 @@ try {
     unlink($default);
     $legacy = $tmp . '/site/daten/bewertungen.json';
     mkdir(dirname($legacy), 0700, true);
-    file_put_contents($legacy, json_encode(['stand' => '2026-10-04', 'gesamtwertung' => 4.9, 'anzahl' => 77, 'bewertungen' => [
+    file_put_contents($legacy, json_encode(['stand' => $day('-1 day'), 'gesamtwertung' => 4.9, 'anzahl' => 77, 'bewertungen' => [
         ['name' => 'Alt', 'datum' => date('Y-m-d', strtotime('-15 days')), 'sterne' => 5, 'text' => $long, 'quelle' => 'google', 'link' => 'https://maps.google.com/?cid=7'],
     ]]));
     [$r, $html] = $run(['koe.active' => true, 'locale' => 'de_DE']);
@@ -186,7 +207,65 @@ try {
     ini_set('error_log', (string) $previousLog);
     holds(is_file($log) && str_contains(file_get_contents($log), 'reading the legacy data file site/daten/bewertungen.json'), 'legacy fallback is logged');
 
-    // 8. A site's own snippet wins over the package's default.
+    // 8. An answer without review texts is a valid state: rating and count stay, the list is gone.
+    $emptyFile = $tmp . '/content/empty.json';
+    $writeData($emptyFile, [], 2.0, 9);
+    [$r, $html] = $run(['koe.active' => true, 'koe.file' => $emptyFile]);
+    holds($r !== null && $r['reviews'] === [] && $r['rating'] === 2.0 && $r['count'] === 9, 'file with an empty review list: rating and count are returned');
+    holds(str_contains($html, '<strong>2.0 out of 5</strong>') && str_contains($html, '9 reviews on Google Maps') && !str_contains($html, '<ul'), 'empty review list: rating and count rendered, no list');
+    $writeData($emptyFile, [], 4.8, 201, 'ChIJFromFile', ['rating' => null]);
+    [$r, $html] = $run(['koe.active' => true, 'koe.file' => $emptyFile]);
+    holds($r === null && trim($html) === '', 'no rating at all (a place without reviews): nothing is shown');
+
+    // 9. Freshness: the last successful fetch (checkedAt) decides, not the day the content changed.
+    $freshFile = $tmp . '/content/fresh.json';
+    $freshLog = $tmp . '/fresh.log';
+    $previousLog = ini_set('error_log', $freshLog);
+    $fresh = ['koe.active' => true, 'koe.file' => $freshFile];
+    $shown = function (array $dates, array $options = []) use ($writeData, $run, $freshFile, $fresh, $review) {
+        $writeData($freshFile, [$review('Fresh', '-3 days')], 4.8, 201, 'ChIJFromFile', $dates);
+        [$r, $html] = $run($options + $fresh);
+        return $r !== null && str_contains($html, 'Fresh');
+    };
+    holds($shown(['fetchedAt' => $day('-40 days'), 'checkedAt' => $day('-1 day')]), 'content unchanged for 40 days but checked yesterday: shown');
+    holds($shown(['checkedAt' => $day('-7 days')]), 'checked 7 days ago: still shown (limit is 7)');
+    holds(!$shown(['checkedAt' => $day('-8 days')]), 'checked 8 days ago: hidden');
+    holds(!$shown(['fetchedAt' => $day('-10 days'), 'checkedAt' => null]), 'file from before checkedAt: falls back to fetchedAt, 10 days: hidden');
+    holds($shown(['fetchedAt' => $day('-3 days'), 'checkedAt' => null]), 'file from before checkedAt, 3 days: shown');
+    holds(!$shown(['fetchedAt' => null, 'checkedAt' => null]), 'no date at all: age unknown, hidden');
+    holds($shown(['checkedAt' => $day('-20 days')], ['koe.maxAgeDays' => 30]), 'koe.maxAgeDays 30: 20 days old is shown');
+    holds(!$shown(['checkedAt' => $day('-3 days')], ['koe.maxAgeDays' => 2]), 'koe.maxAgeDays 2: 3 days old is hidden');
+    holds(!$shown(['checkedAt' => $day('-2 days')], ['koe.maxAgeDays' => 0]), 'koe.maxAgeDays 0 counts as 1, never as "off"');
+    holds($shown(['checkedAt' => $day('-1 day')], ['koe' => ['maxAgeDays' => 2]]), 'nested spelling');
+    // A hidden file is explained in the log, in debug mode only.
+    $writeData($freshFile, [$review('Fresh', '-3 days')], 4.8, 201, 'ChIJFromFile', ['checkedAt' => $day('-9 days')]);
+    file_put_contents($freshLog, '');
+    [$r] = $run($fresh);
+    expect('', (string) file_get_contents($freshLog), 'stale file without debug: nothing logged');
+    [$r, $html] = $run($fresh + ['debug' => true]);
+    holds($r === null && trim($html) === '', 'stale file with debug: still nothing rendered');
+    holds(str_contains((string) file_get_contents($freshLog), 'koe: nothing shown: the data file was last checked on ' . $day('-9 days') . ' (9 days ago, koe.maxAgeDays is 7)'), 'stale file with debug: the log names the date and the limit');
+    ini_set('error_log', (string) $previousLog);
+
+    // 10. The default snippet tells visitors how the reviews were selected and sorted, worded from the options.
+    $writeData($default, [$review('Notice', '-3 days', null, 5, 'id-notice')], 4.8, 201);
+    $noticeOf = fn (string $html) => preg_match('~<p class="koe-notice">(.*?)</p>~s', $html, $m) ? $m[1] : null;
+    $defaultEn = 'Selection of the reviews shown: 5 stars, at least 80 characters of text, not older than 24 months. Newest first, at most 3. The rating and the number of reviews refer to all reviews on Google.';
+    [$r, $html] = $run(['koe.active' => true]);
+    expect($defaultEn, $noticeOf($html), 'default snippet: notice for the default options');
+    expect($defaultEn, $r['notice'], 'koeReviews() hands the notice to own snippets as well');
+    holds(strpos($html, 'koe-notice') > strpos($html, '</ul>'), 'the notice stands below the reviews');
+    [, $html] = $run(['koe.active' => true, 'koe.minRating' => 4, 'koe.minLength' => 120, 'koe.maxAgeMonths' => 12, 'koe.maxCount' => 2]);
+    expect('Selection of the reviews shown: at least 4 stars, at least 120 characters of text, not older than 12 months. Newest first, at most 2. The rating and the number of reviews refer to all reviews on Google.', $noticeOf($html), 'notice follows the options');
+    [, $html] = $run(['koe' => ['active' => true, 'approved' => ['id-notice'], 'minRating' => 3]]);
+    holds(str_contains((string) $noticeOf($html), 'at least 3 stars, at least 80 characters of text, not older than 24 months, approved by the business.'), 'notice names the approved list; nested spelling');
+    [, $html] = $run(['koe.active' => true, 'locale' => 'de_DE']);
+    expect('Auswahl der angezeigten Bewertungen: 5 Sterne, mindestens 80 Zeichen Text, nicht älter als 24 Monate. Neueste zuerst, höchstens 3. Gesamtbewertung und Anzahl beziehen sich auf alle Bewertungen bei Google.', $noticeOf($html), 'German notice');
+    [, $html] = $run(['koe.active' => true, 'koe.approved' => []]);
+    holds($noticeOf($html) === null && str_contains($html, '4.8 out of 5'), 'no single review shown: no notice about their selection');
+    holds(!str_contains(file_get_contents($base . '/snippets/reviews.php'), 'at least 80'), 'the snippet itself carries no fixed rule text');
+
+    // 11. A site's own snippet wins over the package's default.
     mkdir($tmp . '/site/snippets/koe', 0700);
     file_put_contents($tmp . '/site/snippets/koe/reviews.php', '<?php $r = site()->koeReviews(); ?>OWN <?= $r === null ? "off" : count($r["reviews"]) . "/" . $r["limit"] ?>');
     [, $html] = $run(['koe.active' => true]);

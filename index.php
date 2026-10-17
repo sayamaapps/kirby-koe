@@ -64,15 +64,20 @@ App::plugin('sayamaapps/koe', [
 
     'siteMethods' => [
         /**
-         * Overall rating, count and the selected reviews, or null (= show
-         * nothing: switched off, file missing, unreadable or empty).
+         * Overall rating, count and the selected reviews (possibly none), or
+         * null (= show nothing: switched off, file missing, unreadable, about
+         * another place than `koe.placeId` or older than `koe.maxAgeDays`; the
+         * debug log says why).
          *
          *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…'|null,
          *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url'], …],
-         *    'limit' => 3, 'profileUrl' => 'https://…'|null]
+         *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…']
          *
          * `limit` is the configured maximum: a snippet fills the remaining
          * slots with a "read all on Google" tile when count(reviews) < limit.
+         * `notice` tells visitors how the reviews were selected and sorted,
+         * worded from the options in force (plain text, in the snippet's
+         * language); a snippet that lists single reviews prints it.
          */
         'koeReviews' => function (): ?array {
             $kirby = $this->kirby();
@@ -80,10 +85,15 @@ App::plugin('sayamaapps/koe', [
                 return null;
             }
             I18n::setLanguage(Options::language($kirby));
-            $result = Reviews::load(Options::file($kirby), Options::rules($kirby));
+            $rules = Options::rules($kirby);
+            $result = Reviews::load(Options::file($kirby), $rules, null, $problem);
             if ($result === null) {
+                if ($problem !== null) {
+                    Options::debugLog($kirby, 'nothing shown: ' . $problem);
+                }
                 return null;
             }
+            $result['notice'] = Reviews::notice($rules);
             $result['profileUrl'] = $this->koeProfileUrl($result['placeId']);
             return $result;
         },
@@ -91,11 +101,11 @@ App::plugin('sayamaapps/koe', [
         /**
          * Address of the Google profile, or null (then no profile link and no
          * tile). From `koe.placeId`, otherwise from the place id the fetch
-         * recorded in the data file (passed in by koeReviews()).
+         * recorded in the data file (passed in by koeReviews()). When both
+         * exist they are the same: koeReviews() shows nothing otherwise.
          */
         'koeProfileUrl' => function (?string $fromFile = null): ?string {
-            $placeId = Options::get($this->kirby(), 'placeId');
-            return Reviews::profileUrl(is_string($placeId) && trim($placeId) !== '' ? $placeId : $fromFile);
+            return Reviews::profileUrl(Options::placeId($this->kirby()) ?? $fromFile);
         },
     ],
 ]);

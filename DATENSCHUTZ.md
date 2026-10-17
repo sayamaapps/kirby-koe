@@ -26,10 +26,16 @@ Anschrift unseres Betriebs, niemals Daten unserer Website-Besucher. Gespeichert
 werden die Kennung unseres Google-Eintrags, die Gesamtbewertung, die Anzahl der
 Bewertungen sowie höchstens fünf Bewertungen mit Anzeigename und Profil-Link des
 Bewertenden, Link zur Bewertung auf Google Maps, Datum, Sternezahl, Text und der
-Google-Kennung der Bewertung. Jeder Abruf ersetzt die gespeicherte Kopie
-vollständig; es gibt kein Archiv. Eine Bewertung, die Google nicht mehr liefert
-(etwa weil sie zurückgezogen wurde), verschwindet mit dem nächsten Abruf, in der
-Regel innerhalb eines Tages, von unserer Website.
+Google-Kennung der Bewertung. Jeder erfolgreiche Abruf ersetzt die gespeicherte
+Kopie vollständig, auch wenn Google keinen Bewertungstext mehr liefert (die Seite
+zeigt dann nur Gesamtbewertung und Anzahl); es gibt kein Archiv. Eine Bewertung,
+die Google nicht mehr liefert (etwa weil sie zurückgezogen wurde), verschwindet
+mit dem nächsten erfolgreichen Abruf, in der Regel innerhalb eines Tages, von
+unserer Website. Schlägt der Abruf fehl (etwa Kontingent erschöpft, Schlüssel
+widerrufen, Ausfall), bleibt die Kopie unverändert; die Website zeigt sie dann
+nur noch, solange der letzte erfolgreiche Abruf nicht länger als sieben Tage
+zurückliegt (Option `koe.maxAgeDays`), danach erscheint der Abschnitt nicht
+mehr.
 
 Auf der Website erscheinen nur Bewertungen, die festgelegte Regeln erfüllen
 (in der Vorgabe: fünf Sterne, mindestens 80 Zeichen Text, nicht älter als
@@ -51,7 +57,8 @@ keine Daten über Besucher dieser Website.
   öffentlicher Inhalte), sondern der Betreiber des Läufers.
 - **Betroffene** sind die Bewertenden, deren bei Google öffentliche Angaben die
   Website wiedergibt. Löschungen bei Google wirken durch den täglichen Ersatz
-  innerhalb eines Tages auf die Seite durch. Die Git-Geschichte des
+  innerhalb eines Tages nach dem nächsten erfolgreichen Abruf auf die Seite
+  durch. Die Git-Geschichte des
   Repositories enthält ältere Stände der Datei; wer zurückgezogene
   Bewertungen auch dort entfernen will, muss das in Git selbst tun.
 - **Datei.** `site/data/reviews.json` (oder `koe.file`), außerhalb des

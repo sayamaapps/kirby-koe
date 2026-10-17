@@ -19,4 +19,15 @@ return [
     'readAll' => 'Alle auf Google lesen',
     'opensNewTab' => '(öffnet neuen Tab)',
     'author.anonymous' => 'Google-Nutzer',
+
+    'notice.selection' => 'Auswahl der angezeigten Bewertungen: {criteria}.',
+    'notice.stars.exact' => '{stars} Sterne',
+    'notice.stars.min' => 'mindestens {stars} Sterne',
+    'notice.length' => 'mindestens {chars} Zeichen Text',
+    'notice.length.one' => 'mindestens 1 Zeichen Text',
+    'notice.age' => 'nicht älter als {months} Monate',
+    'notice.age.one' => 'nicht älter als 1 Monat',
+    'notice.approved' => 'vom Betrieb freigegeben',
+    'notice.order' => 'Neueste zuerst, höchstens {count}.',
+    'notice.totals' => 'Gesamtbewertung und Anzahl beziehen sich auf alle Bewertungen bei Google.',
 ];

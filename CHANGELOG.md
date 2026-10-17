@@ -13,6 +13,77 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [Unreleased]
+
+### Fixed
+
+- **An answer without review texts is the current state.** 1.0.2 kept the old
+  data file when Google returned no usable review; withdrawn or removed
+  reviews, the old rating and the old count then stayed on the page, and the
+  fetch still exited with 0. `koe-fetch` now replaces the file with what Google
+  returns, an empty review list included. The page shows rating and count
+  without single reviews (`koeReviews()` is no longer `null` for an empty
+  list; only a missing rating, a missing file or an unreadable one still show
+  nothing).
+- A failed fetch (quota, revoked key, outage) left the file in place without
+  limit. The page now hides a file that is too old, see below.
+- **Reviews of one place could appear under the profile link of another.**
+  `koe.placeId` only set the profile link, while the fetch took the first hit
+  of the text search. `koe.placeId` is now the expected place. Rendering: if it
+  differs from the `placeId` in the data file, the page shows nothing and, in
+  debug mode, the log names both ids. The fetch: see `KOE_PLACE_ID` below. The
+  README claimed the option "pins" the place; it did not, now it does.
+
+### Added
+
+- **A notice on the selection in the default snippet.** Google's Places
+  policies ask for a clear notice on how reviews are ordered and filtered; the
+  snippet said nothing. It now prints `<p class="koe-notice">` below the single
+  reviews, worded from the options in force (`minRating`, `minLength`,
+  `maxAgeMonths`, `approved`, `maxCount`, newest first), in English or German
+  (`koe.notice.*` translations). Not a fixed label: it changes with the
+  configuration. Also in the result of `$site->koeReviews()` as `notice`; own
+  snippets should print it. The default selection rules are unchanged. Sites
+  with their own `site/snippets/koe/reviews.php` get no notice until they print
+  `$r['notice']`.
+- **`KOE_PLACE_ID`** / **`--place-id=`** for `koe-fetch`, the same value as
+  `koe.placeId`. If the search or the details lead to another place, the
+  fetch exits with `1`, prints both ids and writes nothing (the details of
+  the wrong place are not even requested when the search already differs).
+  Not set: the first hit is taken, as before. The id recorded in the file is
+  the one the details name.
+- **`checkedAt`** in the data file: the day of the last *successful* fetch,
+  set on every run, also when the content is unchanged. `fetchedAt` stays the
+  day the content last changed. Format stays 2; the field is optional and
+  older readers ignore it.
+- **`koe.maxAgeDays`** (default `7`, at least `1`): when `checkedAt` is older,
+  the page shows nothing and, in Kirby's debug mode, the PHP error log names
+  the dates. Files from before `checkedAt` fall back to `fetchedAt`; a file
+  without any valid date is treated as too old.
+
+### Changed
+
+- **The file is written on every new day.** With unchanged content only the
+  `checkedAt` line changes, so a workflow that commits and deploys "when the
+  file changed" now commits and deploys nightly (one line). That is intended: the
+  deployed file has to carry the day of the last successful fetch, otherwise
+  the page would hide itself after `koe.maxAgeDays`. A second run on the same
+  day still leaves the file alone.
+- **Upgrade order.** A site whose content has not changed for more than seven
+  days has a `fetchedAt` older than the new limit and no `checkedAt`: with the
+  new plugin and the old file the section disappears until the next fetch has
+  been committed and deployed. Run `koe-fetch` with the new version and deploy
+  the file first (or in the same deploy), or raise `koe.maxAgeDays` for the
+  update.
+- **`koe.placeId` can now hide the section.** A site whose option differs
+  from the place id in its data file (a typo, an old id, a deliberately
+  different profile link) shows nothing after the update. Check the `placeId`
+  in the file and set `KOE_PLACE_ID` in the workflow to the same value. A file
+  without a recorded place id (pre-1.0 format) cannot be checked and is shown.
+- **[privacy text]** `PRIVACY.md` / `DATENSCHUTZ.md`: an empty answer
+  replaces the stored copy, and a stored copy is shown for at most
+  `koe.maxAgeDays` after the last successful fetch.
+
 ## [1.0.2] — 2026-10-10
 
 ### Fixed

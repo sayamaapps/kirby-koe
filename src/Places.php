@@ -32,7 +32,9 @@ final class Places
      *
      * Text search instead of a fixed place id on purpose: it survives the
      * listing being recreated. If the Google profile changes its name or
-     * address, the query must follow, otherwise nothing is found.
+     * address, the query must follow, otherwise nothing is found. Whoever
+     * wants the opposite (a different place must never be taken silently)
+     * sets the expected place id, which Fetch checks against this hit.
      *
      * @throws PlacesException when nothing is found or the API fails
      */
@@ -67,7 +69,8 @@ final class Places
      * current answer (no merge with earlier runs: Places policies allow about
      * 24 hours of caching, nothing is archived). Reviews without text are
      * skipped visibly — they are worthless as a quote and already part of
-     * Google's count.
+     * Google's count. An answer without any usable review is a complete
+     * answer too: the list is simply empty.
      *
      * @return array{data: array, messages: list<string>}
      */
@@ -121,6 +124,7 @@ final class Places
         $data = [
             'format'    => Reviews::FORMAT,
             'fetchedAt' => $today,
+            'checkedAt' => $today,
             'note'      => 'Replaced completely by koe-fetch on every run (Places policies: no archive, '
                 . 'cached for about 24 hours). The Places API returns at most five reviews.',
             'placeId'   => $placeId,

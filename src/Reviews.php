@@ -15,9 +15,12 @@ use DateTimeZone;
  *
  * Two file formats are read:
  *
- * - format 2 (written by koe-fetch): `format`, `fetchedAt`, `placeId`,
- *   `rating`, `count`, `reviews[]` with `id`, `name`, `date`, `rating`,
- *   `text`, `source`, `url`, `authorUrl`.
+ * - format 2 (written by koe-fetch): `format`, `fetchedAt` (the day the
+ *   content last changed), `checkedAt` (the day of the last successful fetch,
+ *   changed or not; optional, older files fall back to `fetchedAt`),
+ *   `placeId`, `rating`, `count`, `reviews[]` with `id`, `name`, `date`,
+ *   `rating`, `text`, `source`, `url`, `authorUrl`. `reviews` may be empty:
+ *   that is a valid answer ("no review with text right now").
  * - format 1, the file of the pre-1.0 copy (scripts/bewertungen-holen.py):
  *   `stand`, `gesamtwertung`, `anzahl`, `bewertungen[]` with `name`, `datum`,
  *   `sterne`, `text`, `quelle`, `link`, `autorLink`. No ids, no place id.
@@ -36,24 +39,47 @@ final class Reviews
     public const MAX_COUNT = 3;
     /** Longer texts are cut at a word boundary. */
     public const TRUNCATE = 280;
+    /** The page shows nothing once the last successful fetch is older than this many days. */
+    public const MAX_AGE_DAYS = 7;
 
     public const FORMAT = 2;
 
     /**
      * Reads the file and selects the reviews to show.
      *
+     * Rating and count are shown even when no single review is selected, or
+     * the file has none: an answer without review texts is a valid state.
+     *
+     * @param ?string $problem set to the reason (for the debug log) when a file
+     *                         exists and is withheld on purpose (it is about
+     *                         another place than `placeId`, or too old),
+     *                         otherwise null
      * @return array{rating: float, count: int, placeId: ?string, reviews: list<array{id: ?string, name: string, rating: int, text: string, date: string, month: string, url: ?string}>, limit: int}|null
-     *         null when the file is missing, unreadable or has no reviews: the
-     *         page then shows nothing.
+     *         null when the file is missing, unreadable, has no rating, is
+     *         about another place than `placeId` or is too old (`maxAgeDays`):
+     *         the page then shows nothing.
      */
-    public static function load(string $file, array $rules = [], ?DateTimeImmutable $today = null): ?array
+    public static function load(string $file, array $rules = [], ?DateTimeImmutable $today = null, ?string &$problem = null): ?array
     {
+        $problem = null;
         $data = self::read($file);
         if ($data === null) {
             return null;
         }
         $rules += self::defaultRules();
         $today ??= new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
+        // The file must be about the place the site expects. A file that records
+        // no place id (the pre-1.0 format) cannot be checked and is taken as is.
+        $expected = $rules['placeId'];
+        if ($expected !== null && $data['placeId'] !== null && $data['placeId'] !== $expected) {
+            $problem = 'the data file is about place ' . $data['placeId'] . ', but koe.placeId is ' . $expected
+                . ' — fetch again with KOE_PLACE_ID set to the same id, or correct the option';
+            return null;
+        }
+        $problem = self::staleReason($data, $rules['maxAgeDays'], $today);
+        if ($problem !== null) {
+            return null;
+        }
         return [
             'rating'  => $data['rating'],
             'count'   => $data['count'],
@@ -63,7 +89,7 @@ final class Reviews
         ];
     }
 
-    /** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array} */
+    /** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, maxAgeDays:int, placeId:?string} */
     public static function defaultRules(): array
     {
         return [
@@ -73,14 +99,43 @@ final class Reviews
             'maxCount'     => self::MAX_COUNT,
             'truncate'     => self::TRUNCATE,
             'approved'     => null,
+            'maxAgeDays'   => self::MAX_AGE_DAYS,
+            'placeId'      => null,
         ];
     }
 
     /**
+     * Why the file is too old to show, or null when it is fresh enough. The
+     * day of the last successful fetch counts (`checkedAt`; files from before
+     * that field fall back to `fetchedAt`). A file with no usable date cannot
+     * be shown to be fresh and is withheld.
+     */
+    public static function staleReason(array $data, int $maxAgeDays, DateTimeImmutable $today): ?string
+    {
+        $checked = null;
+        foreach ([$data['checkedAt'] ?? null, $data['fetchedAt'] ?? null] as $candidate) {
+            $day = is_string($candidate)
+                ? DateTimeImmutable::createFromFormat('!Y-m-d', $candidate, $today->getTimezone())
+                : false;
+            if ($day !== false && $day->format('Y-m-d') === $candidate) {
+                $checked = $day;
+                break;
+            }
+        }
+        if ($checked === null) {
+            return 'the data file carries no valid checkedAt/fetchedAt date, so its age is unknown';
+        }
+        $days = (int) $checked->diff($today->setTime(0, 0))->format('%r%a');
+        return $days > $maxAgeDays
+            ? 'the data file was last checked on ' . $checked->format('Y-m-d') . ' (' . $days . ' days ago, koe.maxAgeDays is ' . $maxAgeDays . ')'
+            : null;
+    }
+
+    /**
      * The file as format 2, whichever format it is in — or null when it is
-     * missing, unreadable, has no rating or no reviews.
+     * missing, unreadable or has no rating. An empty review list is valid.
      *
-     * @return array{format: int, fetchedAt: ?string, placeId: ?string, rating: float, count: int, reviews: list<array<string,mixed>>}|null
+     * @return array{format: int, fetchedAt: ?string, checkedAt: ?string, placeId: ?string, rating: float, count: int, reviews: list<array<string,mixed>>}|null
      */
     public static function read(string $file): ?array
     {
@@ -91,7 +146,7 @@ final class Reviews
         return is_array($data) ? self::normalize($data) : null;
     }
 
-    /** @return array{format: int, fetchedAt: ?string, placeId: ?string, rating: float, count: int, reviews: list<array<string,mixed>>}|null */
+    /** @return array{format: int, fetchedAt: ?string, checkedAt: ?string, placeId: ?string, rating: float, count: int, reviews: list<array<string,mixed>>}|null */
     public static function normalize(array $data): ?array
     {
         // A format this reader does not know (a newer one, or a typo) is not
@@ -103,7 +158,7 @@ final class Reviews
         $legacy = !isset($data['reviews']) && isset($data['bewertungen']);
         $reviews = $legacy ? ($data['bewertungen'] ?? null) : ($data['reviews'] ?? null);
         $rating = $legacy ? ($data['gesamtwertung'] ?? null) : ($data['rating'] ?? null);
-        if (!is_array($reviews) || $reviews === [] || !is_numeric($rating)) {
+        if (!is_array($reviews) || !is_numeric($rating)) {
             return null;
         }
         $count = $legacy ? ($data['anzahl'] ?? null) : ($data['count'] ?? null);
@@ -136,6 +191,7 @@ final class Reviews
         return [
             'format'    => $legacy ? 1 : (int) ($data['format'] ?? self::FORMAT),
             'fetchedAt' => $legacy ? ($data['stand'] ?? null) : ($data['fetchedAt'] ?? null),
+            'checkedAt' => $legacy ? null : ($data['checkedAt'] ?? null),
             'placeId'   => is_string($placeId) && $placeId !== '' ? $placeId : null,
             'rating'    => (float) $rating,
             'count'     => is_numeric($count) ? (int) $count : count($list),
@@ -183,6 +239,43 @@ final class Reviews
         }
         usort($hits, fn ($a, $b) => strcmp($b['date'], $a['date']));
         return array_slice($hits, 0, $rules['maxCount']);
+    }
+
+    /**
+     * The notice for visitors: how the reviews shown were selected and in what
+     * order, worded from the rules actually in force (never a fixed text, so it
+     * cannot say "5 stars" on a site that lets 4 stars in). Plain text in the
+     * current language (I18n), to be escaped by the template.
+     *
+     * Covers the rules that decide which reviews appear: stars, text length,
+     * age, an approved list, the order and the maximum number. The rating and
+     * the count are Google's totals; the notice says so.
+     */
+    public static function notice(array $rules): string
+    {
+        $rules += self::defaultRules();
+        $criteria = [];
+        if ($rules['minRating'] >= 5) {
+            $criteria[] = I18n::t('notice.stars.exact', ['stars' => 5]);
+        } elseif ($rules['minRating'] > 1) {
+            $criteria[] = I18n::t('notice.stars.min', ['stars' => $rules['minRating']]);
+        }
+        if ($rules['minLength'] > 0) {
+            $criteria[] = $rules['minLength'] === 1
+                ? I18n::t('notice.length.one')
+                : I18n::t('notice.length', ['chars' => $rules['minLength']]);
+        }
+        $criteria[] = $rules['maxAgeMonths'] === 1
+            ? I18n::t('notice.age.one')
+            : I18n::t('notice.age', ['months' => $rules['maxAgeMonths']]);
+        if ($rules['approved'] !== null) {
+            $criteria[] = I18n::t('notice.approved');
+        }
+        return implode(' ', [
+            I18n::t('notice.selection', ['criteria' => implode(', ', $criteria)]),
+            I18n::t('notice.order', ['count' => $rules['maxCount']]),
+            I18n::t('notice.totals'),
+        ]);
     }
 
     /**
