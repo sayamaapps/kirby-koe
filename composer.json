@@ -4,7 +4,7 @@
     "type": "kirby-plugin",
     "license": "MIT",
     "keywords": ["kirby", "kirby-plugin", "kirby-5", "google", "reviews", "places-api", "privacy"],
-    "homepage": "https://github.com/simsimmal/kirby-koe",
+    "homepage": "https://github.com/sayamaapps/kirby-koe",
     "authors": [
         {
             "name": "Simon Räder",
@@ -12,8 +12,8 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/simsimmal/kirby-koe/issues",
-        "source": "https://github.com/simsimmal/kirby-koe"
+        "issues": "https://github.com/sayamaapps/kirby-koe/issues",
+        "source": "https://github.com/sayamaapps/kirby-koe"
     },
     "require": {
         "php": "^8.2",

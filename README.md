@@ -29,7 +29,7 @@ Composer installs the plugin into `site/plugins/koe/` (via `getkirby/composer-in
 Until the package is on Packagist, add the repository first:
 
 ```json
-"repositories": [{ "type": "vcs", "url": "https://github.com/simsimmal/kirby-koe" }]
+"repositories": [{ "type": "vcs", "url": "https://github.com/sayamaapps/kirby-koe" }]
 ```
 
 Manual installation (download into `site/plugins/koe/`) also works; the CLI is then `php site/plugins/koe/bin/koe-fetch`.
