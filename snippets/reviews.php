@@ -7,16 +7,18 @@
  *   <?php snippet('koe/reviews') ?>
  *   <?php snippet('koe/reviews', ['title' => 'What our guests say', 'logo' => 'assets/GoogleMaps_Logo_Gray.svg']) ?>
  *
- * Google Places policies: name the author, link the name to the single
- * review on Google Maps (without a safe link the name stays text), show the
- * "Google Maps" attribution. Without $logo (or `koe.logo`) the attribution
- * is text; with it, the official, unaltered logo served from your own site.
+ * Google Places policies: name the author with the profile picture, link
+ * both to the review on Google Maps (googleMapsUri; without a safe link they
+ * stay unlinked), show the "Google Maps" attribution. The picture comes from
+ * the site's own server (route koe/avatar/…), never from Google. Without
+ * $logo (or `koe.logo`) the attribution is text; with it, the official,
+ * unaltered logo served from your own site.
  *
  * Rating and count are always shown; empty slots are filled by a "read all
  * on Google" tile. Below the single reviews a notice says how they were
  * selected and sorted (Google Places policies); it is worded from the options
- * in force. With the module off or no usable file, the section is omitted
- * entirely. Deliberately no structured data: Google ignores review
+ * in force. With the module off or nothing in the cache yet, the section is
+ * omitted entirely. Deliberately no structured data: Google ignores review
  * markup a business publishes about itself. No CSS: the grid belongs to the
  * site (classes koe-*).
  *
@@ -42,10 +44,11 @@ $tab = '<span class="sr-only"> ' . esc($t('opensNewTab')) . '</span>';
   <?php if ($r['reviews'] !== []) : ?>
   <ul class="koe-list">
     <?php foreach ($r['reviews'] as $review) : ?>
+    <?php $avatar = $review['avatar'] ? '<img class="koe-avatar" src="' . esc($review['avatar'], 'attr') . '" width="32" height="32" alt="" loading="lazy">' : '' ?>
     <li class="koe-review">
       <p class="koe-stars" role="img" aria-label="<?= esc($t('starsOutOf', ['stars' => $review['rating']]), 'attr') ?>"><span aria-hidden="true"><?= str_repeat('★', $review['rating']) ?></span></p>
       <blockquote><?= nl2br(esc($review['text'])) ?></blockquote>
-      <p class="koe-author"><?php if ($review['url']) : ?><a href="<?= esc($review['url'], 'attr') ?>" target="_blank" rel="noopener"><?= esc($review['name']) ?><?= $tab ?></a><?php else : ?><?= esc($review['name']) ?><?php endif ?> · <time datetime="<?= esc($review['date'], 'attr') ?>"><?= esc($review['month']) ?></time></p>
+      <p class="koe-author"><?php if ($review['url']) : ?><a href="<?= esc($review['url'], 'attr') ?>" target="_blank" rel="noopener"><?= $avatar ?><?= esc($review['name']) ?><?= $tab ?></a><?php else : ?><?= $avatar ?><?= esc($review['name']) ?><?php endif ?> · <time datetime="<?= esc($review['date'], 'attr') ?>"><?= esc($review['month']) ?></time></p>
     </li>
     <?php endforeach ?>
     <?php if ($profile && count($r['reviews']) < $r['limit']) : ?>

@@ -6,12 +6,69 @@ All notable changes to this project are documented here. Versions follow
 - **A change to the default selection rules** (which reviews are shown
   without configuration) is a **major** version: a site would show other
   voices after a routine update.
-- **A change to the data file format** increases `format` and ships with a
-  reader for the old format, so a site never shows nothing between the update
-  and the next nightly fetch.
+- **A change to what the cache holds** needs no reader for the old state:
+  the cache is fetched anew on the next page view.
 - A change to the privacy text (`DATENSCHUTZ.md` / `PRIVACY.md`) is marked
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
+
+## [Unreleased]
+
+Koe keeps no data file anymore. The site fetches the reviews itself into a
+short-lived cache, when a page needs them.
+
+### Changed (breaking)
+
+- **Fetch on demand into a cache instead of a nightly data file.** When a
+  page view finds no fitting reviews in the cache, it shows the section
+  without them and fetches after its response is sent (one Places request:
+  the details of `koe.placeId`); the views after it show them. The cache is
+  Kirby's plugin cache `sayamaapps.koe` (`site/cache/` by default): not in
+  git, not deployed, not in a backup of `content/` or `storage/`. Every fetch
+  empties it first; a failed fetch leaves it empty and is retried after
+  15 minutes at the earliest, and always logged (key scrubbed). The page
+  without reviews is not put into Kirby's page cache, a page with reviews not
+  longer than the reviews.
+- **Only what is shown is kept**: rating, count and the reviews that pass the
+  rules (at most `maxCount`). Other reviews, author profile addresses and
+  Google's picture addresses are discarded.
+- **The API key lives on the web server**: `koe.key` (string or closure) or
+  the environment variable `GOOGLE_PLACES_API_KEY` (`getenv()`, then
+  `$_SERVER`). Keep it out of git.
+- **`koe.placeId` is required**; without it nothing is shown or fetched. If
+  Google answers for another id, nothing is kept and the log names both ids.
+- **`koe-fetch` only shows** the place id and the reviews with their ids. It
+  writes nothing; `KOE_FILE`, `--file`, `KOE_PLACE_ID` and `--place-id` are
+  gone. The nightly workflow and the data file are no longer needed (see the
+  README, "Upgrading from 1.x").
+- **Removed:** the options `koe.file` and `koe.maxAgeDays`, reading the data
+  file (formats 1 and 2, the pre-1.0 `site/daten/bewertungen.json`
+  included), `checkedAt`/`fetchedAt`, and the argument of
+  `$site->koeProfileUrl()` (it uses `koe.placeId`).
+
+### Added
+
+- **`koe.cacheHours`** (default `24`, whole hours from `1` to `24`): how long
+  the cache holds reviews and pictures.
+- **Profile pictures** of the reviewers, fetched by the server without the
+  key into the same cache (JPEG, PNG, GIF or WebP up to 256 KB, checked by
+  content), served by the route `koe/avatar/<key>`. The default snippet shows
+  them in front of the name (`<img class="koe-avatar">`, 32 × 32, empty
+  `alt`); `koeReviews()` hands them as `avatar` to own snippets.
+
+### Fixed
+
+- **The link of a review is `googleMapsUri` only.** Without it the name was
+  linked to the author's Google profile page; now it is not linked.
+
+### [privacy text]
+
+- `PRIVACY.md` / `DATENSCHUTZ.md` describe the cache: fetch on demand from
+  the web server, only the shown reviews kept, holding time, pictures from
+  the own server, the key on the web server. The statement that Google allows
+  caching for about 24 hours is gone: Google's terms name no such exception
+  for review content.
+- The README no longer recommends committing the reviews to git.
 
 ## [1.1.0] — 2026-10-17
 

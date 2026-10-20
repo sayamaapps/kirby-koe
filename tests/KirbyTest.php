@@ -1,19 +1,25 @@
 <?php
 /**
  * The plugin with real Kirby, in a throwaway directory: the switch (off by
- * default), the options for file, place id, rules, approval, title, logo and
- * language, the default snippet with the Places obligations (author, link
- * only when safe, attribution), the legacy file fallback, and that a site's
- * own site/snippets/koe/reviews.php wins — sites with their own markup rely
- * on that.
+ * default), place id and key, the fetch on demand (the first view after the
+ * cache expired starts it after the response and shows nothing itself), the
+ * holding time, the profile picture route, the options for rules, approval,
+ * title, logo and language, the default snippet with the Places obligations
+ * (author with picture and link only when safe, attribution, notice), and
+ * that a site's own site/snippets/koe/reviews.php wins.
  *   php tests/KirbyTest.php
  */
 $base = dirname(__DIR__);
 if (!is_file($base . '/vendor/autoload.php')) { fwrite(STDERR, "Composer dependencies missing; run composer install first\n"); exit(1); }
 require $base . '/vendor/autoload.php';
+// Loaded before Kirby loads the plugin, so the test can replace the transport and the deferral.
+foreach (['I18n', 'Options', 'Reviews', 'PlacesException', 'Places', 'Store', 'Plugin'] as $class) {
+    require_once $base . '/src/' . $class . '.php';
+}
 
 use Kirby\Cms\App;
 use Kirby\Template\Snippet;
+use Koe\Plugin;
 
 $checks = 0;
 function expect($expected, $actual, string $what): void
@@ -39,30 +45,60 @@ function removeTree(string $path): void
 }
 
 $tmp = sys_get_temp_dir() . '/koe-kirby-' . bin2hex(random_bytes(6));
+$key = 'AIza-not-a-real-key-0000';
 $long = str_repeat('Friendly, competent and fast, happy to come back. ', 3);
-/** Format 2 review. */
-$review = fn (string $name, string $ago, ?string $url = null, int $rating = 5, ?string $id = null) => array_filter([
-    'id' => $id, 'name' => $name, 'date' => date('Y-m-d', strtotime($ago)), 'rating' => $rating, 'text' => $long, 'source' => 'google', 'url' => $url,
+$jpeg = "\xFF\xD8\xFF\xE0" . str_repeat('j', 100);
+
+/** One review of a Places details answer. */
+$review = fn (string $name, string $ago, ?string $url = null, int $rating = 5, ?string $id = null, ?string $photo = null) => array_filter([
+    'name' => $id === null ? null : 'places/ChIJExample/reviews/' . $id,
+    'rating' => $rating,
+    'originalText' => ['text' => $long],
+    'authorAttribution' => array_filter(['displayName' => $name, 'photoUri' => $photo]),
+    'publishTime' => date('Y-m-d', strtotime($ago)) . 'T10:00:00Z',
+    'googleMapsUri' => $url,
 ], fn ($v) => $v !== null);
-/** A day relative to today, Y-m-d. */
-$day = fn (string $ago) => date('Y-m-d', strtotime($ago));
-/** Format 2 file, fetched and checked today unless $dates says otherwise (a null value leaves the key out). */
-$writeData = function (string $file, array $reviews, float $rating = 4.8, int $count = 201, ?string $placeId = 'ChIJFromFile', array $dates = []) use ($day): void {
-    @mkdir(dirname($file), 0700, true);
-    $data = array_merge(['format' => 2, 'fetchedAt' => $day('now'), 'checkedAt' => $day('now'), 'placeId' => $placeId, 'rating' => $rating, 'count' => $count, 'reviews' => $reviews], $dates);
-    file_put_contents($file, json_encode(array_filter($data, fn ($v) => $v !== null)));
-};
-/** New Kirby instance with these options; returns [koeReviews(), snippet HTML (entities decoded)]. */
-$run = function (array $options, array $snippetData = [], bool $withBase = true) use ($tmp): array {
-    Snippet::$cache = []; // Kirby remembers snippet paths per process
-    $roots = ['index' => $tmp . '/public', 'content' => $tmp . '/content', 'site' => $tmp . '/site', 'storage' => $tmp . '/storage'];
-    if ($withBase) {
-        $roots['base'] = $tmp;
+
+/** What Google answers next: the details for ChIJExample (or a raw ['status', 'body']), plus pictures. Records every call. */
+$answer = ['id' => 'ChIJExample', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => []];
+$pictures = [];
+$calls = [];
+Plugin::$transport = function (string $url, array $headers, ?string $body) use (&$answer, &$pictures, &$calls): array {
+    $calls[] = ['url' => $url, 'headers' => $headers];
+    if (str_starts_with($url, Koe\Places::ENDPOINT)) {
+        return isset($answer['status']) ? $answer : ['status' => 200, 'body' => json_encode($answer)];
     }
+    return $pictures[$url] ?? ['status' => 404, 'body' => ''];
+};
+/** The refresh is queued instead of running after the response. */
+$queue = [];
+Plugin::$defer = function (Closure $job) use (&$queue): void {
+    $queue[] = $job;
+};
+
+$on = ['koe.active' => true, 'koe.placeId' => 'ChIJExample', 'koe.key' => $key];
+/** New Kirby instance with these options; returns [koeReviews(), snippet HTML (entities decoded), Kirby]. */
+$run = function (array $options, array $snippetData = []) use ($tmp): array {
+    Snippet::$cache = []; // Kirby remembers snippet paths per process
+    $roots = ['index' => $tmp . '/public', 'base' => $tmp, 'content' => $tmp . '/content', 'site' => $tmp . '/site', 'storage' => $tmp . '/storage'];
     $kirby = new App(['roots' => $roots, 'options' => ['url' => 'http://example.invalid'] + $options]);
     $html = html_entity_decode((string) $kirby->snippet('koe/reviews', $snippetData, true));
     return [$kirby->site()->koeReviews(), $html, $kirby];
 };
+/** Runs the queued refreshes (as after the response). */
+$drain = function () use (&$queue): void {
+    while ($job = array_shift($queue)) {
+        $job();
+    }
+};
+/** Empties the cache and fills it with $answer for these options: the state after a first visitor. */
+$fill = function (array $options) use ($run, $drain, $tmp, &$queue): void {
+    removeTree($tmp . '/site/cache');
+    $queue = [];
+    $run($options);
+    $drain();
+};
+$cacheFiles = fn () => is_dir($tmp . '/site/cache') ? count(iterator_to_array(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp . '/site/cache', FilesystemIterator::SKIP_DOTS)))) : 0;
 
 try {
     foreach (['public', 'content/home', 'site/plugins', 'site/snippets', 'site/templates', 'storage'] as $dir) {
@@ -71,204 +107,215 @@ try {
     symlink($base, $tmp . '/site/plugins/koe');
     file_put_contents($tmp . '/site/templates/default.php', 'Fixture');
     file_put_contents($tmp . '/content/home/home.txt', 'Title: Home');
+    $log = $tmp . '/php-error.log';
+    ini_set('error_log', $log);
+    $logged = function () use ($log): string {
+        $text = is_file($log) ? (string) file_get_contents($log) : '';
+        file_put_contents($log, '');
+        return $text;
+    };
 
-    $default = $tmp . '/site/data/reviews.json';
-    $writeData($default, [
-        $review('With Link', '-10 days', 'https://maps.google.com/?cid=42', 5, 'id-with'),
+    $answer['reviews'] = [
+        $review('With Link', '-10 days', 'https://www.google.com/maps/reviews/42', 5, 'id-with', 'https://lh3.googleusercontent.com/a/with=s128'),
         $review('Without Link', '-20 days', null, 5, 'id-without'),
         $review('Evil Link', '-30 days', 'javascript:alert(1)', 5, 'id-evil'),
         $review('Four Stars', '-5 days', null, 4, 'id-four'),
-    ]);
+    ];
+    $pictures = ['https://lh3.googleusercontent.com/a/with=s128' => ['status' => 200, 'body' => $jpeg]];
 
-    // 1. Plugin registered; off by default: file is there, still nothing.
-    [$r, $html, $kirby] = $run([]);
+    // 1. Plugin registered; off by default: nothing shown, nothing fetched.
+    [$r, $html, $kirby] = $run(['koe.placeId' => 'ChIJExample', 'koe.key' => $key]);
     holds($kirby->plugin('sayamaapps/koe') !== null, 'plugin sayamaapps/koe registered');
     expect(null, $r, 'without koe.active koeReviews() is null');
     expect('', trim($html), 'without koe.active the snippet prints nothing');
+    expect([], $queue, 'without koe.active nothing is fetched');
     expect('Read all on Google', $kirby->translation('en')->get('koe.readAll'), 'strings registered as Kirby translations');
     expect('Alle auf Google lesen', $kirby->translation('de')->get('koe.readAll'), 'German Kirby translation');
     holds(function_exists('koe_option'), 'koe_option() helper');
-    // Only a real true switches on (like kizami.active).
-    [$r] = $run(['koe.active' => 'yes']);
+    [$r] = $run(['koe.active' => 'yes'] + $on);
     expect(null, $r, 'koe.active = "yes" must not switch on');
-    // No German fallback: the pre-1.0 keys do nothing.
-    [$r] = $run(['bewertungen.aktiv' => true]);
-    expect(null, $r, 'bewertungen.aktiv is not read');
+    expect([], $queue, 'koe.active = "yes": nothing fetched');
 
-    // 2. On, default file, place id from the file; English by default.
-    [$r, $html] = $run(['koe.active' => true]);
-    holds($r !== null && $r['count'] === 201 && $r['rating'] === 4.8 && count($r['reviews']) === 3, 'default file read, four stars out');
+    // 2. Without a place id or without a key: nothing, no request; debug mode says why.
+    $logged();
+    [$r, $html] = $run(['koe.active' => true, 'koe.key' => $key, 'debug' => true]);
+    holds($r === null && trim($html) === '' && $queue === [], 'no koe.placeId: nothing shown, nothing fetched');
+    holds(str_contains($logged(), 'koe.placeId is not set'), 'no koe.placeId: debug log says so');
+    [$r] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJExample', 'debug' => true]);
+    holds($r === null && $queue === [], 'no key: nothing shown, nothing fetched');
+    holds(str_contains($logged(), 'no API key'), 'no key: debug log says so');
+    [$r] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
+    expect('', $logged(), 'without debug nothing is logged for a missing key');
+
+    // 3. On demand: the first view shows nothing and queues one refresh; it runs after the response.
+    $calls = [];
+    [$r, $html, $kirby] = $run($on);
+    holds($r === null && trim($html) === '', 'empty cache: the first view shows nothing');
+    expect(1, count($queue), 'empty cache: one refresh queued, not two (snippet and method both asked)');
+    expect([], $calls, 'empty cache: no request during the page view');
+    expect(false, $kirby->response()->cache(), 'empty cache: the page without reviews is not put into Kirby\'s page cache');
+    [$r] = $run($on);
+    expect(1, count($queue), 'a second view before the refresh ran: no second refresh');
+    $drain();
+    expect(Koe\Places::ENDPOINT . 'places/ChIJExample?languageCode=en', $calls[0]['url'], 'the refresh asks for the details of koe.placeId, in the site language');
+    holds(in_array('X-Goog-Api-Key: ' . $key, $calls[0]['headers'], true), 'the refresh uses koe.key');
+    expect([], $calls[1]['headers'], 'the picture is fetched without the key');
+    holds(is_dir($tmp . '/site/cache') && !is_dir($tmp . '/site/data') && !is_dir($tmp . '/content/reviews'), 'kept in site/cache, nowhere else');
+    $calls = [];
+
+    // 4. Now shown, from the cache, without any request.
+    [$r, $html, $kirby] = $run($on);
+    expect([], $calls, 'cached: no request');
+    expect([], $queue, 'cached: no refresh');
+    holds($r !== null && $r['count'] === 201 && $r['rating'] === 4.8 && count($r['reviews']) === 3, 'rating, count, three reviews; four stars out');
     expect(3, $r['limit'], 'limit = maxCount');
-    expect('https://www.google.com/maps/place/?q=place_id:ChIJFromFile', $r['profileUrl'], 'profile URL from the place id the fetch recorded');
+    expect('https://www.google.com/maps/place/?q=place_id:ChIJExample', $r['profileUrl'], 'profile URL from koe.placeId');
+    $expires = $kirby->response()->expires();
+    holds(is_int($expires) && $expires > time() + 23 * 3600 && $expires <= time() + 24 * 3600, 'Kirby\'s page cache must not keep the page longer than the reviews (24 h by default)');
     holds(str_contains($html, '<strong>4.8 out of 5</strong>') && str_contains($html, '201 reviews on Google Maps'), 'rating, count and text attribution in English');
-    holds((bool) preg_match('~<a href="https://maps\.google\.com/\?cid=42" target="_blank" rel="noopener">With Link<span class="sr-only"> \(opens in a new tab\)</span></a>~', $html), 'name with link, target/rel and hint');
+    $with = $r['reviews'][0];
+    holds((bool) preg_match('~^http://example\.invalid/koe/avatar/[a-f0-9]{32}$~', (string) $with['avatar']), 'avatar is an address on the own site');
+    holds((bool) preg_match('~<a href="https://www\.google\.com/maps/reviews/42" target="_blank" rel="noopener"><img class="koe-avatar" src="' . preg_quote($with['avatar'], '~') . '" width="32" height="32" alt="" loading="lazy">With Link<span class="sr-only"> \(opens in a new tab\)</span></a>~', $html), 'picture and name inside the link to the review, target/rel and hint');
+    holds(!str_contains($html, 'googleusercontent'), 'no picture address of Google in the page');
     foreach (['Without Link', 'Evil Link'] as $name) {
-        holds((bool) preg_match('~<p class="koe-author">' . $name . ' ·~', $html), "$name as plain text");
+        holds((bool) preg_match('~<p class="koe-author">' . $name . ' ·~', $html), "$name as plain text, without picture");
     }
     holds(!str_contains($html, 'javascript:'), 'javascript: link never printed');
     holds(!str_contains($html, 'Four Stars'), 'four-star review not shown');
     holds(str_contains($html, 'View profile') && !str_contains($html, 'Read all on Google'), 'three reviews: profile link, no tile');
-    holds(!str_contains($html, '<img'), 'without logo no image');
+    holds(!str_contains($html, 'koe-logo'), 'without logo no logo image');
     holds(str_contains($html, '<h2 id="koe-title">Reviews on Google</h2>'), 'default title');
     holds((bool) preg_match('~<time datetime="\d{4}-\d{2}-\d{2}">[A-Z][a-z]+ \d{4}</time>~', $html), 'English month and year');
-    holds(str_contains($html, 'aria-label="5 out of 5 stars"'), 'stars label');
 
-    // 3. koe.placeId is the expected place: equal to the file it changes nothing, different it hides the section.
-    [$r, $html, $kirby] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJFromFile']);
-    expect('https://www.google.com/maps/place/?q=place_id:ChIJFromFile', $r['profileUrl'], 'koe.placeId equal to the file: profile link as before');
-    holds(count($r['reviews']) === 3, 'koe.placeId equal to the file: reviews shown');
-    expect('https://www.google.com/maps/place/?q=place_id:ChIJFromFile', $kirby->site()->koeProfileUrl(), 'koeProfileUrl() from the option');
-    expect(null, (new App(['roots' => ['index' => $tmp . '/public', 'site' => $tmp . '/site', 'content' => $tmp . '/content', 'storage' => $tmp . '/storage']]))->site()->koeProfileUrl(), 'koeProfileUrl() without option and argument');
-    $idLog = $tmp . '/identity.log';
-    $previousLog = ini_set('error_log', $idLog);
-    file_put_contents($idLog, '');
-    [$r, $html] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJOption']);
-    holds($r === null && trim($html) === '', 'koe.placeId differs from the place in the file: nothing is shown (not another business under this profile link)');
-    expect('', (string) file_get_contents($idLog), 'place mismatch without debug: nothing logged');
-    [$r] = $run(['koe.active' => true, 'koe.placeId' => ' ChIJOption ', 'debug' => true]);
-    holds($r === null, 'place mismatch in debug mode: still nothing');
-    holds(str_contains((string) file_get_contents($idLog), 'koe: nothing shown: the data file is about place ChIJFromFile, but koe.placeId is ChIJOption'), 'place mismatch in debug mode: the log names both ids');
-    [$r] = $run(['koe.active' => true, 'koe.placeId' => ' ChIJFromFile ']);
-    holds($r !== null, 'koe.placeId is trimmed');
-    [$r] = $run(['koe.active' => true, 'koe.placeId' => '']);
-    holds($r !== null && $r['placeId'] === 'ChIJFromFile', 'empty koe.placeId counts as not set: the id of the file is used');
-    ini_set('error_log', (string) $previousLog);
-    // A file that records no place id (the pre-1.0 format) cannot be checked; the option then supplies the profile link.
-    $writeData($tmp . '/content/no-id.json', [$review('Anon', '-3 days')], 4.8, 5, null);
-    [$r] = $run(['koe.active' => true, 'koe.file' => 'content/no-id.json', 'koe.placeId' => 'bad id']);
-    holds($r !== null && $r['profileUrl'] === null, 'file without place id, invalid koe.placeId: shown, no profile (no fallback)');
+    // 5. The picture route serves the cached picture; anything else is a 404.
+    $response = $kirby->call('koe/avatar/' . basename($with['avatar']));
+    expect([200, 'image/jpeg', $jpeg], [$response->code(), $response->type(), $response->body()], 'picture served from the own server');
+    holds((bool) preg_match('/^public, max-age=(\d+)$/', (string) ($response->headers()['Cache-Control'] ?? ''), $m) && (int) $m[1] > 23 * 3600 && (int) $m[1] <= 24 * 3600, 'browser may keep it only as long as the cache');
+    expect('nosniff', $response->headers()['X-Content-Type-Options'] ?? null, 'nosniff');
+    expect(404, $kirby->call('koe/avatar/ffffffffffffffffffffffffffffffff')->code(), 'unknown picture: 404');
+    [, , $off] = $run(['koe.active' => false] + $on);
+    expect(404, $off->call('koe/avatar/' . basename($with['avatar']))->code(), 'module off: 404');
 
-    // 4. German: locale, site language option, or koe.language.
-    [, $html] = $run(['koe.active' => true, 'locale' => 'de_DE.UTF-8']);
+    // 6. The key from the environment ($_SERVER for Apache SetEnv) or a closure.
+    $_SERVER['GOOGLE_PLACES_API_KEY'] = 'AIza-from-server';
+    $calls = [];
+    $fill(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
+    holds(in_array('X-Goog-Api-Key: AIza-from-server', $calls[0]['headers'] ?? [], true), 'key from $_SERVER');
+    unset($_SERVER['GOOGLE_PLACES_API_KEY']);
+    putenv('GOOGLE_PLACES_API_KEY=AIza-from-env');
+    $calls = [];
+    $fill(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
+    holds(in_array('X-Goog-Api-Key: AIza-from-env', $calls[0]['headers'] ?? [], true), 'key from getenv()');
+    putenv('GOOGLE_PLACES_API_KEY');
+    $calls = [];
+    $fill(['koe.key' => fn () => 'AIza-from-closure'] + $on);
+    holds(in_array('X-Goog-Api-Key: AIza-from-closure', $calls[0]['headers'] ?? [], true), 'koe.key as closure');
+
+    // 7. Holding time: koe.cacheHours, 1 to 24.
+    foreach ([[2, 2], [0, 1], [48, 24], ['6', 6]] as [$hours, $expected]) {
+        $fill(['koe.cacheHours' => $hours] + $on);
+        [, , $kirby] = $run(['koe.cacheHours' => $hours] + $on);
+        $left = $kirby->response()->expires() - time();
+        holds($left > ($expected * 3600 - 120) && $left <= $expected * 3600, "koe.cacheHours $hours → $expected h");
+    }
+
+    // 8. Settings changed: the cached data no longer fits, the next view fetches anew.
+    $fill($on);
+    $queue = [];
+    [$r] = $run(['koe.minRating' => 4] + $on);
+    holds($r === null && count($queue) === 1, 'other rules than cached: nothing shown, refresh queued');
+    $drain();
+    [$r] = $run(['koe.minRating' => 4] + $on);
+    expect(['Four Stars', 'With Link', 'Without Link'], array_column($r['reviews'], 'name'), 'refreshed for the new rules');
+    $queue = [];
+    [$r] = $run(['koe.placeId' => 'ChIJOther'] + $on);
+    holds($r === null && count($queue) === 1, 'other place than cached: nothing shown, refresh queued');
+    $queue = [];
+
+    // 9. A failed refresh is logged (also without debug), without the key, and the cache stays empty.
+    removeTree($tmp . '/site/cache');
+    $answer = ['status' => 403, 'body' => json_encode(['error' => ['status' => 'PERMISSION_DENIED', 'message' => 'API key not valid: ' . $key]])];
+    $logged();
+    $run($on);
+    $drain();
+    $text = $logged();
+    holds(str_contains($text, 'koe: fetching the reviews failed: Places API answered 403') && !str_contains($text, $key), 'failure logged, key scrubbed');
+    [$r] = $run($on);
+    holds($r === null && $queue === [], 'after a failure: nothing shown, no new attempt during the pause');
+    expect(1, $cacheFiles(), 'after a failure only the retry marker is left');
+    $answer = ['id' => 'ChIJExample', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => [
+        $review('With Link', '-10 days', 'https://www.google.com/maps/reviews/42', 5, 'id-with', 'https://lh3.googleusercontent.com/a/with=s128'),
+        $review('Without Link', '-20 days', null, 5, 'id-without'),
+        $review('Evil Link', '-30 days', 'javascript:alert(1)', 5, 'id-evil'),
+        $review('Four Stars', '-5 days', null, 4, 'id-four'),
+    ]];
+
+    // 10. German: locale, or koe.language; the request asks Google in that language.
+    $calls = [];
+    $fill(['locale' => 'de_DE.UTF-8'] + $on);
+    expect(Koe\Places::ENDPOINT . 'places/ChIJExample?languageCode=de', $calls[0]['url'], 'German site asks in German');
+    [, $html] = $run(['locale' => 'de_DE.UTF-8'] + $on);
     holds(str_contains($html, '<strong>4,8 von 5</strong>') && str_contains($html, '201 Bewertungen auf Google Maps') && str_contains($html, 'Profil ansehen') && str_contains($html, '(öffnet neuen Tab)'), 'German via locale');
     holds(str_contains($html, '>Bewertungen auf Google</h2>'), 'German default title');
-    [, $html] = $run(['koe.active' => true, 'locale' => 'de_DE', 'koe.language' => 'en']);
+    $fill(['locale' => 'de_DE', 'koe.language' => 'en'] + $on);
+    [, $html] = $run(['locale' => 'de_DE', 'koe.language' => 'en'] + $on);
     holds(str_contains($html, '4.8 out of 5'), 'koe.language wins over locale');
 
-    // 5. One review plus place id: tile fills the gap; title and logo from snippet data or options.
-    $writeData($tmp . '/content/reviews.json', [$review('Only', '-3 days')], 5.0, 22, null);
-    $opt = ['koe.active' => true, 'koe.placeId' => 'ChIJOption', 'koe.file' => 'content/reviews.json'];
-    [$r, $html] = $run($opt, ['title' => 'What our customers say', 'logo' => 'assets/GoogleMaps_Logo_Gray.svg']);
-    holds($r !== null && $r['count'] === 22 && array_column($r['reviews'], 'name') === ['Only'] && $r['placeId'] === null, 'koe.file relative to the project root');
-    holds(str_contains($html, 'Read all on Google') && str_contains($html, '<p>22 reviews</p>'), 'tile with count below three reviews');
+    // 11. Approval, the tile, title and logo.
+    $approved = ['koe.approved' => ['id-without']] + $on;
+    $fill($approved);
+    [$r, $html] = $run($approved, ['title' => 'What our customers say', 'logo' => 'assets/GoogleMaps_Logo_Gray.svg']);
+    expect(['Without Link'], array_column($r['reviews'], 'name'), 'approved list');
+    holds(str_contains($html, 'Read all on Google') && str_contains($html, '<p>201 reviews</p>'), 'tile with count below three reviews');
     holds(str_contains($html, '>What our customers say</h2>'), 'title from snippet data');
     holds((bool) preg_match('~<img class="koe-logo" src="[^"]*/assets/GoogleMaps_Logo_Gray\.svg"[^>]*alt="Google Maps">~', $html), 'logo with alt text');
-    holds(str_contains($html, '5.0 out of 5'), 'integer rating with one decimal');
-    [, $html] = $run($opt + ['koe.title' => 'Voices', 'koe.logo' => 'assets/logo.svg']);
+    [, $html] = $run($approved + ['koe.title' => 'Voices', 'koe.logo' => 'assets/logo.svg']);
     holds(str_contains($html, '>Voices</h2>') && str_contains($html, '/assets/logo.svg"'), 'title and logo from options');
-    [, $html] = $run($opt + ['koe.logo' => 'assets/logo.svg'], ['logo' => null]);
+    [, $html] = $run($approved + ['koe.logo' => 'assets/logo.svg'], ['logo' => null]);
     holds(str_contains($html, '/assets/logo.svg"'), 'snippet data null falls back to the option');
-    // Without a base root (sites with their own index.php) the directory above site/ counts.
-    [$r] = $run($opt, [], false);
-    holds($r !== null && $r['count'] === 22, 'without base root relative to the directory above site/');
-    [$r] = $run(['koe.active' => true, 'koe.file' => $tmp . '/content/reviews.json']);
-    holds($r !== null && $r['count'] === 22, 'koe.file absolute');
-    [$r] = $run(['koe.active' => true, 'koe.file' => fn () => kirby()->root('content') . '/reviews.json']);
-    holds($r !== null && $r['count'] === 22, 'koe.file as closure');
-    [$r, $html] = $run(['koe.active' => true, 'koe.file' => 'does/not/exist.json']);
-    holds($r === null && trim($html) === '', 'missing file: section omitted, no error');
-
-    // 6. Rules and approval as options.
-    [$r] = $run(['koe.active' => true, 'koe.minRating' => 4, 'koe.maxCount' => 2]);
-    expect(['Four Stars', 'With Link'], array_column($r['reviews'], 'name'), 'minRating 4 and maxCount 2');
-    expect(2, $r['limit'], 'limit follows maxCount');
-    [$r, $html] = $run(['koe.active' => true, 'koe.approved' => ['id-without']]);
-    expect(['Without Link'], array_column($r['reviews'], 'name'), 'approved list');
-    holds(str_contains($html, 'Read all on Google'), 'approved: tile fills the gap');
-    [$r, $html] = $run(['koe.active' => true, 'koe.approved' => []]);
+    $none = ['koe.approved' => []] + $on;
+    $fill($none);
+    [$r, $html] = $run($none);
     expect([], $r['reviews'], 'approved []: no single review');
-    holds(str_contains($html, '4.8 out of 5') && !str_contains($html, '<ul'), 'approved []: rating and count still shown, no list');
-    [$r] = $run(['koe' => ['active' => true, 'approved' => ['id-with', 'id-four'], 'minRating' => 4]]);
+    holds(str_contains($html, '4.8 out of 5') && !str_contains($html, '<ul') && !str_contains($html, 'koe-notice'), 'approved []: rating and count still shown, no list, no notice');
+    $nested = ['koe' => ['active' => true, 'placeId' => 'ChIJExample', 'key' => $key, 'approved' => ['id-with', 'id-four'], 'minRating' => 4]];
+    $fill($nested);
+    [$r] = $run($nested);
     expect(['Four Stars', 'With Link'], array_column($r['reviews'], 'name'), 'nested spelling, approved with lower rating');
 
-    // 7. Legacy file: read while the default file is missing, German keys, no place id → option needed.
-    // The fallback is logged (not silent); capture the log to check and to keep the test output clean.
-    $log = $tmp . '/php-error.log';
-    $previousLog = ini_set('error_log', $log);
-    unlink($default);
-    $legacy = $tmp . '/site/daten/bewertungen.json';
-    mkdir(dirname($legacy), 0700, true);
-    file_put_contents($legacy, json_encode(['stand' => $day('-1 day'), 'gesamtwertung' => 4.9, 'anzahl' => 77, 'bewertungen' => [
-        ['name' => 'Alt', 'datum' => date('Y-m-d', strtotime('-15 days')), 'sterne' => 5, 'text' => $long, 'quelle' => 'google', 'link' => 'https://maps.google.com/?cid=7'],
-    ]]));
-    [$r, $html] = $run(['koe.active' => true, 'locale' => 'de_DE']);
-    holds($r !== null && $r['count'] === 77 && $r['rating'] === 4.9 && array_column($r['reviews'], 'name') === ['Alt'], 'legacy file read');
-    expect(null, $r['profileUrl'], 'legacy file carries no place id');
-    holds(str_contains($html, '4,9 von 5') && str_contains($html, 'cid=7') && !str_contains($html, 'Alle auf Google lesen'), 'legacy rendered in German, no tile without place id');
-    [$r] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJOption']);
-    holds(str_contains((string) $r['profileUrl'], 'ChIJOption') , 'legacy plus koe.placeId: profile link');
-    [$r] = $run(['koe.active' => true, 'koe.approved' => ['anything']]);
-    expect([], $r['reviews'], 'legacy reviews have no ids, so an approved list shows none');
-    // Default file back: it wins over the legacy one.
-    $writeData($default, [$review('New', '-1 day')], 4.8, 201);
-    [$r] = $run(['koe.active' => true]);
-    expect(['New'], array_column($r['reviews'], 'name'), 'default file wins over the legacy file');
-    unlink($legacy);
-    ini_set('error_log', (string) $previousLog);
-    holds(is_file($log) && str_contains(file_get_contents($log), 'reading the legacy data file site/daten/bewertungen.json'), 'legacy fallback is logged');
+    // 12. An answer without review texts: rating and count; without any rating: nothing.
+    $answer['reviews'] = [];
+    $answer['rating'] = 2.0;
+    $answer['userRatingCount'] = 9;
+    $fill($on);
+    [$r, $html] = $run($on);
+    holds($r !== null && $r['reviews'] === [] && $r['rating'] === 2.0 && $r['count'] === 9, 'empty review list: rating and count');
+    holds(str_contains($html, '<strong>2.0 out of 5</strong>') && !str_contains($html, '<ul'), 'empty review list: rendered without list');
+    unset($answer['rating'], $answer['userRatingCount']);
+    $fill($on);
+    [$r, $html] = $run($on);
+    holds($r === null && trim($html) === '' && $queue === [], 'no rating at all: nothing shown, and no refresh on every view');
 
-    // 8. An answer without review texts is a valid state: rating and count stay, the list is gone.
-    $emptyFile = $tmp . '/content/empty.json';
-    $writeData($emptyFile, [], 2.0, 9);
-    [$r, $html] = $run(['koe.active' => true, 'koe.file' => $emptyFile]);
-    holds($r !== null && $r['reviews'] === [] && $r['rating'] === 2.0 && $r['count'] === 9, 'file with an empty review list: rating and count are returned');
-    holds(str_contains($html, '<strong>2.0 out of 5</strong>') && str_contains($html, '9 reviews on Google Maps') && !str_contains($html, '<ul'), 'empty review list: rating and count rendered, no list');
-    $writeData($emptyFile, [], 4.8, 201, 'ChIJFromFile', ['rating' => null]);
-    [$r, $html] = $run(['koe.active' => true, 'koe.file' => $emptyFile]);
-    holds($r === null && trim($html) === '', 'no rating at all (a place without reviews): nothing is shown');
-
-    // 9. Freshness: the last successful fetch (checkedAt) decides, not the day the content changed.
-    $freshFile = $tmp . '/content/fresh.json';
-    $freshLog = $tmp . '/fresh.log';
-    $previousLog = ini_set('error_log', $freshLog);
-    $fresh = ['koe.active' => true, 'koe.file' => $freshFile];
-    $shown = function (array $dates, array $options = []) use ($writeData, $run, $freshFile, $fresh, $review) {
-        $writeData($freshFile, [$review('Fresh', '-3 days')], 4.8, 201, 'ChIJFromFile', $dates);
-        [$r, $html] = $run($options + $fresh);
-        return $r !== null && str_contains($html, 'Fresh');
-    };
-    holds($shown(['fetchedAt' => $day('-40 days'), 'checkedAt' => $day('-1 day')]), 'content unchanged for 40 days but checked yesterday: shown');
-    holds($shown(['checkedAt' => $day('-7 days')]), 'checked 7 days ago: still shown (limit is 7)');
-    holds(!$shown(['checkedAt' => $day('-8 days')]), 'checked 8 days ago: hidden');
-    holds(!$shown(['fetchedAt' => $day('-10 days'), 'checkedAt' => null]), 'file from before checkedAt: falls back to fetchedAt, 10 days: hidden');
-    holds($shown(['fetchedAt' => $day('-3 days'), 'checkedAt' => null]), 'file from before checkedAt, 3 days: shown');
-    holds(!$shown(['fetchedAt' => null, 'checkedAt' => null]), 'no date at all: age unknown, hidden');
-    holds($shown(['checkedAt' => $day('-20 days')], ['koe.maxAgeDays' => 30]), 'koe.maxAgeDays 30: 20 days old is shown');
-    holds(!$shown(['checkedAt' => $day('-3 days')], ['koe.maxAgeDays' => 2]), 'koe.maxAgeDays 2: 3 days old is hidden');
-    holds(!$shown(['checkedAt' => $day('-2 days')], ['koe.maxAgeDays' => 0]), 'koe.maxAgeDays 0 counts as 1, never as "off"');
-    holds($shown(['checkedAt' => $day('-1 day')], ['koe' => ['maxAgeDays' => 2]]), 'nested spelling');
-    // A hidden file is explained in the log, in debug mode only.
-    $writeData($freshFile, [$review('Fresh', '-3 days')], 4.8, 201, 'ChIJFromFile', ['checkedAt' => $day('-9 days')]);
-    file_put_contents($freshLog, '');
-    [$r] = $run($fresh);
-    expect('', (string) file_get_contents($freshLog), 'stale file without debug: nothing logged');
-    [$r, $html] = $run($fresh + ['debug' => true]);
-    holds($r === null && trim($html) === '', 'stale file with debug: still nothing rendered');
-    holds(str_contains((string) file_get_contents($freshLog), 'koe: nothing shown: the data file was last checked on ' . $day('-9 days') . ' (9 days ago, koe.maxAgeDays is 7)'), 'stale file with debug: the log names the date and the limit');
-    ini_set('error_log', (string) $previousLog);
-
-    // 10. The default snippet tells visitors how the reviews were selected and sorted, worded from the options.
-    $writeData($default, [$review('Notice', '-3 days', null, 5, 'id-notice')], 4.8, 201);
+    // 13. The notice, worded from the options.
+    $answer = ['id' => 'ChIJExample', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => [$review('Notice', '-3 days', null, 5, 'id-notice')]];
     $noticeOf = fn (string $html) => preg_match('~<p class="koe-notice">(.*?)</p>~s', $html, $m) ? $m[1] : null;
     $defaultEn = 'Selection of the reviews shown: 5 stars, at least 80 characters of text, not older than 24 months. Newest first, at most 3. The rating and the number of reviews refer to all reviews on Google.';
-    [$r, $html] = $run(['koe.active' => true]);
+    $fill($on);
+    [$r, $html] = $run($on);
     expect($defaultEn, $noticeOf($html), 'default snippet: notice for the default options');
     expect($defaultEn, $r['notice'], 'koeReviews() hands the notice to own snippets as well');
     holds(strpos($html, 'koe-notice') > strpos($html, '</ul>'), 'the notice stands below the reviews');
-    [, $html] = $run(['koe.active' => true, 'koe.minRating' => 4, 'koe.minLength' => 120, 'koe.maxAgeMonths' => 12, 'koe.maxCount' => 2]);
+    $strict = ['koe.minRating' => 4, 'koe.minLength' => 120, 'koe.maxAgeMonths' => 12, 'koe.maxCount' => 2] + $on;
+    $fill($strict);
+    [, $html] = $run($strict);
     expect('Selection of the reviews shown: at least 4 stars, at least 120 characters of text, not older than 12 months. Newest first, at most 2. The rating and the number of reviews refer to all reviews on Google.', $noticeOf($html), 'notice follows the options');
-    [, $html] = $run(['koe' => ['active' => true, 'approved' => ['id-notice'], 'minRating' => 3]]);
-    holds(str_contains((string) $noticeOf($html), 'at least 3 stars, at least 80 characters of text, not older than 24 months, approved by the business.'), 'notice names the approved list; nested spelling');
-    [, $html] = $run(['koe.active' => true, 'locale' => 'de_DE']);
-    expect('Auswahl der angezeigten Bewertungen: 5 Sterne, mindestens 80 Zeichen Text, nicht älter als 24 Monate. Neueste zuerst, höchstens 3. Gesamtbewertung und Anzahl beziehen sich auf alle Bewertungen bei Google.', $noticeOf($html), 'German notice');
-    [, $html] = $run(['koe.active' => true, 'koe.approved' => []]);
-    holds($noticeOf($html) === null && str_contains($html, '4.8 out of 5'), 'no single review shown: no notice about their selection');
     holds(!str_contains(file_get_contents($base . '/snippets/reviews.php'), 'at least 80'), 'the snippet itself carries no fixed rule text');
 
-    // 11. A site's own snippet wins over the package's default.
+    // 14. A site's own snippet wins over the package's default.
+    $fill($on);
     mkdir($tmp . '/site/snippets/koe', 0700);
     file_put_contents($tmp . '/site/snippets/koe/reviews.php', '<?php $r = site()->koeReviews(); ?>OWN <?= $r === null ? "off" : count($r["reviews"]) . "/" . $r["limit"] ?>');
-    [, $html] = $run(['koe.active' => true]);
+    [, $html] = $run($on);
     expect('OWN 1/3', trim($html), 'site/snippets/koe/reviews.php must override the package snippet');
 
     echo "Koe with Kirby: all $checks checks passed\n";

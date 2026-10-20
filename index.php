@@ -5,19 +5,25 @@ use Kirby\Cms\App;
 require_once __DIR__ . '/src/I18n.php';
 require_once __DIR__ . '/src/Options.php';
 require_once __DIR__ . '/src/Reviews.php';
+require_once __DIR__ . '/src/PlacesException.php';
+require_once __DIR__ . '/src/Places.php';
+require_once __DIR__ . '/src/Store.php';
+require_once __DIR__ . '/src/Plugin.php';
 
 use Koe\I18n;
 use Koe\Options;
+use Koe\Plugin;
 use Koe\Reviews;
 
 /**
  * Koe (声, "voice") — Google reviews served from your own server. Off by
  * default: without `'koe.active' => true`, $site->koeReviews() is null and
- * the snippet prints nothing, even when the data file is there.
+ * the snippet prints nothing and nothing is fetched.
  *
- * The website never talks to Google. bin/koe-fetch (nightly, on a CI runner
- * or a server cron) writes the data file; the API key lives only there, as a
- * secret, never in a Kirby option.
+ * The visitor's browser never talks to Google. The server fetches the
+ * reviews when a page view finds none in its short-lived cache (Plugin,
+ * Store), after that view's response; profile pictures are served from the
+ * same cache through the route below.
  *
  * Defaults are passed as fallback values directly at each option call, NOT
  * in an 'options' block (Kirby would file them under sayamaapps.koe.active
@@ -50,6 +56,13 @@ foreach (I18n::LANGUAGES as $koeLanguage) {
 unset($koeLanguage, $koeKey, $koeText);
 
 App::plugin('sayamaapps/koe', [
+    // Kirby's plugin cache `sayamaapps.koe` (site/cache/ by default): the only
+    // place anything from Google is kept. A site may set
+    // 'sayamaapps.koe.cache' => ['type' => 'apcu'] or the like.
+    'options' => [
+        'cache' => true,
+    ],
+
     // The snippet strings, also usable as t('koe.<key>').
     'translations' => $koeTranslations,
 
@@ -62,15 +75,24 @@ App::plugin('sayamaapps/koe', [
         'koe/reviews' => __DIR__ . '/snippets/reviews.php',
     ],
 
+    // Profile pictures of the reviewers, from the cache: the browser never
+    // asks Google for them.
+    'routes' => [
+        [
+            'pattern' => 'koe/avatar/(:alphanum)',
+            'action'  => fn (string $id) => Plugin::avatar(App::instance(), $id),
+        ],
+    ],
+
     'siteMethods' => [
         /**
          * Overall rating, count and the selected reviews (possibly none), or
-         * null (= show nothing: switched off, file missing, unreadable, about
-         * another place than `koe.placeId` or older than `koe.maxAgeDays`; the
-         * debug log says why).
+         * null (= show nothing: switched off, no `koe.placeId`, no key,
+         * nothing cached yet — then the reviews are fetched after this
+         * response — or a place without rating; the debug log says why).
          *
-         *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…'|null,
-         *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url'], …],
+         *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…',
+         *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url', 'avatar'], …],
          *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…']
          *
          * `limit` is the configured maximum: a snippet fills the remaining
@@ -86,26 +108,21 @@ App::plugin('sayamaapps/koe', [
             }
             I18n::setLanguage(Options::language($kirby));
             $rules = Options::rules($kirby);
-            $result = Reviews::load(Options::file($kirby), $rules, null, $problem);
+            $result = Plugin::reviews($kirby, $rules);
             if ($result === null) {
-                if ($problem !== null) {
-                    Options::debugLog($kirby, 'nothing shown: ' . $problem);
-                }
                 return null;
             }
             $result['notice'] = Reviews::notice($rules);
-            $result['profileUrl'] = $this->koeProfileUrl($result['placeId']);
+            $result['profileUrl'] = $this->koeProfileUrl();
             return $result;
         },
 
         /**
-         * Address of the Google profile, or null (then no profile link and no
-         * tile). From `koe.placeId`, otherwise from the place id the fetch
-         * recorded in the data file (passed in by koeReviews()). When both
-         * exist they are the same: koeReviews() shows nothing otherwise.
+         * Address of the Google profile from `koe.placeId`, or null (then no
+         * profile link and no tile).
          */
-        'koeProfileUrl' => function (?string $fromFile = null): ?string {
-            return Reviews::profileUrl(Options::placeId($this->kirby()) ?? $fromFile);
+        'koeProfileUrl' => function (): ?string {
+            return Reviews::profileUrl(Options::placeId($this->kirby()));
         },
     ],
 ]);

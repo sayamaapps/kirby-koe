@@ -18,70 +18,49 @@ final class Options
 {
     public const PREFIX = 'koe.';
 
-    /** Data file the fetch writes, relative to the project root. */
-    public const DEFAULT_FILE = 'site/data/reviews.json';
+    /** Where the API key is looked for when `koe.key` is not set. */
+    public const ENV_KEY = 'GOOGLE_PLACES_API_KEY';
 
-    /**
-     * Where the pre-1.0 copy (`site/plugins/bewertungen`) kept the file,
-     * relative to the project root. Read when the default file does not exist
-     * yet, so a site keeps showing its reviews between the switch to the
-     * package and the first nightly fetch (or the `git mv` in the switch PR).
-     */
-    public const LEGACY_FILE = 'site/daten/bewertungen.json';
+    /** Holding time of the cache in hours: the default, and the longest allowed. */
+    public const CACHE_HOURS = 24;
 
     public static function get(App $kirby, string $key, mixed $default = null): mixed
     {
         return $kirby->option(self::PREFIX . $key) ?? $default;
     }
 
-    /** Project root: Kirby's `base` root, otherwise the directory above `site/`. */
-    public static function base(App $kirby): string
-    {
-        return $kirby->root('base') ?? dirname($kirby->root('site'));
-    }
-
     /**
-     * Absolute path of the data file.
-     *
-     * `koe.file` may be an absolute path, a path relative to the project root
-     * (NOT to the working directory, which is public/ under Apache), or a
-     * closure returning either. Without the option: site/data/reviews.json, or
-     * the legacy site/daten/bewertungen.json while only that one exists (the
-     * fallback is logged so it does not go unnoticed).
+     * The Places API key: `koe.key` (a string or a closure returning one),
+     * otherwise the environment variable GOOGLE_PLACES_API_KEY — getenv(),
+     * then $_SERVER, where Apache's SetEnv lands under FastCGI. Null when
+     * none is set.
      */
-    public static function file(App $kirby): string
+    public static function key(App $kirby): ?string
     {
-        $option = self::get($kirby, 'file');
-        if ($option instanceof Closure) {
-            $option = $option();
+        $key = self::get($kirby, 'key');
+        if ($key instanceof Closure) {
+            $key = $key();
         }
-        $base = self::base($kirby);
-        if ($option !== null) {
-            return self::resolve((string) $option, $base);
+        foreach ([$key, getenv(self::ENV_KEY), $_SERVER[self::ENV_KEY] ?? null] as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
         }
-        $default = self::resolve(self::DEFAULT_FILE, $base);
-        $legacy = self::resolve(self::LEGACY_FILE, $base);
-        if (!is_file($default) && is_file($legacy)) {
-            error_log('Koe: reading the legacy data file ' . self::LEGACY_FILE . ' — move it to ' . self::DEFAULT_FILE . ' (git mv) or set koe.file.');
-            return $legacy;
-        }
-        return $default;
+        return null;
     }
 
-    /** Absolute path stays, anything else is taken relative to $base. */
-    public static function resolve(string $path, string $base): string
+    /** `koe.cacheHours` as minutes: whole hours from 1 to CACHE_HOURS, default CACHE_HOURS. */
+    public static function minutes(App $kirby): int
     {
-        $path = trim($path);
-        return str_starts_with($path, '/') ? $path : rtrim($base, '/') . '/' . $path;
+        return 60 * max(1, min(self::CACHE_HOURS, (int) self::get($kirby, 'cacheHours', self::CACHE_HOURS)));
     }
 
     /**
      * Selection rules, each with the default that the pre-1.0 copy had as a
-     * constant. `approved` is null (off) or a list of review ids. `maxAgeDays`
-     * is not a selection rule but the freshness limit of the data file (at
-     * least 1 day), and `placeId` the expected place (null = not configured).
+     * constant. `approved` is null (off) or a list of review ids, and
+     * `placeId` the place (null = not configured).
      *
-     * @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, maxAgeDays:int, placeId:?string}
+     * @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, placeId:?string}
      */
     public static function rules(App $kirby): array
     {
@@ -93,12 +72,11 @@ final class Options
             'maxCount'     => max(0, (int) self::get($kirby, 'maxCount', Reviews::MAX_COUNT)),
             'truncate'     => max(0, (int) self::get($kirby, 'truncate', Reviews::TRUNCATE)),
             'approved'     => is_array($approved) ? array_values(array_map('strval', $approved)) : null,
-            'maxAgeDays'   => max(1, (int) self::get($kirby, 'maxAgeDays', Reviews::MAX_AGE_DAYS)),
             'placeId'      => self::placeId($kirby),
         ];
     }
 
-    /** `koe.placeId`, trimmed: the place the data file must be about. Null when not configured. */
+    /** `koe.placeId`, trimmed: the place whose reviews are fetched. Null when not configured. */
     public static function placeId(App $kirby): ?string
     {
         $placeId = self::get($kirby, 'placeId');
@@ -107,8 +85,7 @@ final class Options
 
     /**
      * Logs why nothing is shown, but only in Kirby's debug mode: on a live
-     * site a data file that is withheld on purpose must not fill the error log
-     * on every page view.
+     * site a missing setting must not fill the error log on every page view.
      */
     public static function debugLog(App $kirby, string $message): void
     {

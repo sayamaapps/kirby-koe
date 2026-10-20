@@ -1,6 +1,6 @@
 {
     "name": "sayamaapps/kirby-koe",
-    "description": "Google reviews for Kirby CMS, served from your own server: a nightly fetch via the Places API (New), rule-based selection, no request to Google from the visitor's browser.",
+    "description": "Google reviews for Kirby CMS, served from your own server: fetched on demand via the Places API (New) into a short-lived cache, rule-based selection, no request to Google from the visitor's browser.",
     "type": "kirby-plugin",
     "license": "MIT",
     "keywords": ["kirby", "kirby-plugin", "kirby-5", "google", "reviews", "places-api", "privacy"],

@@ -6,7 +6,7 @@ use Closure;
 
 /**
  * Places API (New): find the place by text, read rating, count and reviews,
- * and turn the answer into the format 2 data file.
+ * and turn the answer into what Koe keeps (parse()).
  *
  * The transport is a closure (url, headers, body|null) → ['status' => int,
  * 'body' => string], so tests run against recorded answers without a
@@ -65,14 +65,17 @@ final class Places
     }
 
     /**
-     * Builds the format 2 file from a details answer. Always the COMPLETE
-     * current answer (no merge with earlier runs: Places policies allow about
-     * 24 hours of caching, nothing is archived). Reviews without text are
-     * skipped visibly — they are worthless as a quote and already part of
-     * Google's count. An answer without any usable review is a complete
-     * answer too: the list is simply empty.
+     * Rating, count and the reviews with text from a details answer. Always
+     * the complete current answer, nothing merged with earlier ones. Reviews
+     * without text are skipped visibly — they are worthless as a quote and
+     * already part of Google's count. An answer without any usable review is
+     * a complete answer too: the list is simply empty.
      *
-     * @return array{data: array, messages: list<string>}
+     * Per review: `id`, `name`, `date`, `rating`, `text`, `url` (googleMapsUri,
+     * only when Google sends one) and `photo` (the profile picture address,
+     * https only), which the refresh fetches and replaces by its own copy.
+     *
+     * @return array{data: array{placeId: string, rating: ?float, count: int, reviews: list<array<string,mixed>>}, messages: list<string>}
      */
     public static function parse(array $details, string $placeId, string $today): array
     {
@@ -98,22 +101,22 @@ final class Places
             $id = (string) ($review['name'] ?? '');
             $slash = strrpos($id, '/');
             $id = $slash === false ? $id : substr($id, $slash + 1);
-            $authorUrl = trim((string) ($author['uri'] ?? ''));
-            // Link to the single review; without googleMapsUri the author profile as a stand-in.
-            $url = trim((string) ($review['googleMapsUri'] ?? '')) ?: $authorUrl;
+            // The link to the review and the author is googleMapsUri (Places
+            // policies); there is no stand-in when it is missing.
+            $url = trim((string) ($review['googleMapsUri'] ?? ''));
+            $photo = trim((string) ($author['photoUri'] ?? ''));
             $entry = [
                 'id'     => $id !== '' ? $id : null,
                 'name'   => $name,
                 'date'   => $date,
                 'rating' => (int) ($review['rating'] ?? 5),
                 'text'   => $text,
-                'source' => 'google',
             ];
             if ($url !== '') {
                 $entry['url'] = $url;
             }
-            if ($authorUrl !== '') {
-                $entry['authorUrl'] = $authorUrl;
+            if (preg_match('~^https://[^\s"<>]+$~i', $photo)) {
+                $entry['photo'] = $photo;
             }
             $reviews[] = $entry;
             $messages[] = '  ' . ($entry['id'] ?? '(no id)') . '  ' . $label . ', ' . $entry['rating'] . ' stars' . ($url === '' ? ' (no link)' : '');
@@ -122,17 +125,12 @@ final class Places
         $rating = $details['rating'] ?? null;
         $count = $details['userRatingCount'] ?? null;
         $data = [
-            'format'    => Reviews::FORMAT,
-            'fetchedAt' => $today,
-            'checkedAt' => $today,
-            'note'      => 'Replaced completely by koe-fetch on every run (Places policies: no archive, '
-                . 'cached for about 24 hours). The Places API returns at most five reviews.',
-            'placeId'   => $placeId,
-            'rating'    => is_numeric($rating) ? (float) $rating : null,
-            'count'     => is_numeric($count) ? (int) $count : count($reviews),
-            'reviews'   => $reviews,
+            'placeId' => $placeId,
+            'rating'  => is_numeric($rating) ? (float) $rating : null,
+            'count'   => is_numeric($count) ? (int) $count : count($reviews),
+            'reviews' => $reviews,
         ];
-        $messages[] = count($reviews) . ' reviews stored; Google reports ' . $data['count']
+        $messages[] = count($reviews) . ' reviews with text; Google reports ' . $data['count']
             . ' with an average of ' . ($data['rating'] ?? '?') . '.';
         return ['data' => $data, 'messages' => $messages];
     }
@@ -158,7 +156,7 @@ final class Places
             $error = is_array($decoded) && is_array($decoded['error'] ?? null) ? $decoded['error'] : [];
             $detail = trim((string) ($error['status'] ?? '') . ' ' . (string) ($error['message'] ?? ''));
             $hint = $status === 429 || ($error['status'] ?? '') === 'RESOURCE_EXHAUSTED'
-                ? ' — the daily quota of the Google Cloud project is used up; the data file is left as it is.'
+                ? ' — the daily quota of the Google Cloud project is used up.'
                 : '';
             throw new PlacesException('Places API answered ' . $status . ($detail !== '' ? ' ' . self::scrub($detail, $this->key) : '') . $hint);
         }
