@@ -12,6 +12,16 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [2.0.2] — 2026-10-20
+
+### [privacy text]
+
+- `DATENSCHUTZ.md` / `PRIVACY.md` start with a short text block for the
+  privacy policy: what is shown, that viewing the page contacts no Google
+  server, what a click does and how to object. The technical details stay
+  below as background for questions, not for the policy itself. No code
+  change.
+
 ## [2.0.1] — 2026-10-20
 
 ### Fixed

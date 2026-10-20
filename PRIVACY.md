@@ -5,6 +5,20 @@ block for privacy policies, which is the authoritative version. Both describe
 the implementation. They are not legal advice. Each operator has to determine
 the legal basis and the wording for their own site.
 
+## Text for the privacy policy
+
+Keep it short; visitors need what is shown, that nothing goes to Google when
+the page loads, what a click does and how to object. Adapt the page name.
+
+> **Google reviews**
+>
+> On our home page we show selected public Google reviews. Texts and profile
+> pictures are served by our own server: viewing the page makes no connection
+> to Google, and we pass no data about you to Google. Only when you click a
+> link to Google does Google Maps open; Google's privacy policy applies there.
+> If you would rather your review did not appear here, a short message to us
+> is enough.
+
 ## What the visitor's browser does
 
 Nothing towards Google. The page shows reviews that the site's own server
