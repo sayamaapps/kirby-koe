@@ -7,7 +7,23 @@ Dieser Baustein beschreibt die Implementierung. Rechtsgrundlage, Interessenabwä
 und die Formulierung müssen vor Veröffentlichung für den konkreten Betrieb fachlich
 geprüft und ergänzt werden. Der Text ist keine Rechtsberatung.
 
-## Google-Bewertungen — technischer Textbaustein
+## Textbaustein für die Datenschutzerklärung
+
+Kurz halten: Besucher brauchen nur, was gezeigt wird, dass beim Aufruf nichts
+zu Google geht, was ein Klick auslöst und wie man widerspricht. Seite und
+Anrede (Sie/du) an die eigene Erklärung anpassen.
+
+> ## Google-Bewertungen
+>
+> Auf der Startseite zeigen wir ausgewählte öffentliche Google-Bewertungen.
+> Texte und Profilbilder liefert unser eigener Server aus: Beim Aufruf der
+> Seite wird keine Verbindung zu Google aufgebaut, und wir geben keine Daten
+> von Ihnen an Google weiter. Erst wenn Sie einen Link zu Google anklicken,
+> öffnet sich Google Maps; dort gilt die Datenschutzerklärung von Google. Wenn
+> Ihre Bewertung hier nicht erscheinen soll, genügt eine kurze Nachricht an
+> uns.
+
+## Technischer Hintergrund (für Rückfragen, nicht für die Erklärung)
 
 Auf unserer Website zeigen wir die Gesamtbewertung, die Anzahl der Bewertungen und
 ausgewählte Bewertungen unseres Betriebs aus Google Maps. Diese Inhalte werden
