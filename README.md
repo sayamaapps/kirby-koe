@@ -42,7 +42,7 @@ Manual installation (download into `site/plugins/koe/`) also works; the CLI is t
 4. **Cap the quota.** In *APIs & Services → Places API (New) → Quotas*, set a daily limit. A fetch is one request (the details of `koe.placeId`); with the default holding time of 24 hours that is about one a day, with `koe.cacheHours` 1 about 24. A failed fetch is retried after 15 minutes at the earliest. A cap of 30 per day covers every setting; a capped project can never produce a surprising bill, even if the key leaks. `koe-fetch` needs two more per run.
 5. **Give the web server the key**, outside git: either as `koe.key` in a config file that the deploy writes from a secret and git ignores (for example a `site/config/config.<host>.php`, or a file your `config.php` merges in), or as the environment variable **`GOOGLE_PLACES_API_KEY`** of the web server (Apache `SetEnv`, PHP-FPM `env[]`). `koe.key` may also be a closure.
 
-What Google's Places policies ask of a page that shows reviews: name the author with profile picture and link (`googleMapsUri`), show the "Google Maps" attribution (logo or text), and tell visitors how the reviews were selected. The default snippet does all of it. Google's terms name exceptions from the caching restrictions only for the place id (and coordinates), not for review content; Koe keeps reviews in a short-lived cache all the same (see [Cache](#cache)). Whether that fits your use of the Places API is yours to judge.
+What Google's Places policies ask of a page that shows reviews: name the author with profile picture and link (`googleMapsUri`), show the "Google Maps" attribution (logo or text), and tell visitors how the reviews were selected. The default snippet does all of it.
 
 ## Finding the place id
 

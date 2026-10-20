@@ -74,7 +74,4 @@ keine Daten über Besucher dieser Website.
 - **Google-Vorgaben** (Places-Richtlinien): Autor mit Profilbild nennen und
   auf die Bewertung bei Google Maps verlinken, Attribution „Google Maps" zeigen,
   Auswahlregeln nennen. Das Vorgabe-Snippet erfüllt das; wer eigenes Markup
-  baut, muss es selbst einhalten. Eine Ausnahme für das Zwischenspeichern von
-  Bewertungstexten nennen Googles Bedingungen nicht (nur für die Kennung des
-  Eintrags und Koordinaten); der Zwischenspeicher ist so kurz wie eingestellt
-  und enthält nur das Angezeigte.
+  baut, muss es selbst einhalten.

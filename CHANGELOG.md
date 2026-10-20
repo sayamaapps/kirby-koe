@@ -66,8 +66,7 @@ short-lived cache, when a page needs them.
 - `PRIVACY.md` / `DATENSCHUTZ.md` describe the cache: fetch on demand from
   the web server, only the shown reviews kept, holding time, pictures from
   the own server, the key on the web server. The statement that Google allows
-  caching for about 24 hours is gone: Google's terms name no such exception
-  for review content.
+  caching for about 24 hours is gone.
 - The README no longer recommends committing the reviews to git.
 
 ## [1.1.0] — 2026-10-17

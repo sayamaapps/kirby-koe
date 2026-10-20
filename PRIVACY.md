@@ -56,10 +56,6 @@ holding time after it was fetched. If a fetch fails (quota, revoked key,
 outage), the cache stays empty and the page shows no reviews; the next
 attempt follows 15 minutes later at the earliest.
 
-Google's terms name exceptions from their caching restrictions only for the
-place id (and coordinates), not for review content. This cache is kept as
-short as configured and holds only what is shown.
-
 ## What is shown
 
 Rating and count always. Of the single reviews only those that pass the
