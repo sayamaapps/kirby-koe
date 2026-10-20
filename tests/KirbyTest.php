@@ -191,6 +191,8 @@ try {
     $response = $kirby->call('koe/avatar/' . basename($with['avatar']));
     expect([200, 'image/jpeg', $jpeg], [$response->code(), $response->type(), $response->body()], 'picture served from the own server');
     holds((bool) preg_match('/^public, max-age=(\d+)$/', (string) ($response->headers()['Cache-Control'] ?? ''), $m) && (int) $m[1] > 23 * 3600 && (int) $m[1] <= 24 * 3600, 'browser may keep it only as long as the cache');
+    $expires = strtotime((string) ($response->headers()['Expires'] ?? ''));
+    holds($expires !== false && $expires > time() + 23 * 3600 && $expires <= time() + 24 * 3600 + 5, 'Expires matches, so mod_expires adds no year');
     expect('nosniff', $response->headers()['X-Content-Type-Options'] ?? null, 'nosniff');
     expect(404, $kirby->call('koe/avatar/ffffffffffffffffffffffffffffffff')->code(), 'unknown picture: 404');
     [, , $off] = $run(['koe.active' => false] + $on);
