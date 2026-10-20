@@ -1,6 +1,6 @@
 <?php
 /**
- * Selection rules, both file formats, approval, links and the profile URL —
+ * Selection rules, approval, links, the profile URL and the notice —
  * without Kirby.
  *   php tests/ReviewsTest.php
  */
@@ -17,32 +17,18 @@ function expect($expected, $actual, string $what): void
     if ($expected !== $actual) { throw new RuntimeException($what . ': ' . var_export($actual, true)); }
     $checks++;
 }
-$files = [];
-// Files carry the day of the last fetch unless a test says otherwise ($today below is 2026-10-05).
-$tmpFile = function (array $data, bool $dated = true) use (&$files): string {
-    if ($dated && !isset($data['stand'])) {
-        $data += ['fetchedAt' => '2026-10-05'];
-    }
-    $file = tempnam(sys_get_temp_dir(), 'koe');
-    file_put_contents($file, json_encode($data));
-    return $files[] = $file;
-};
-
 $today = new DateTimeImmutable('2026-10-05', new DateTimeZone('Europe/Berlin'));
 $long = str_repeat('Very nice place, great food and friendly people. ', 2); // > 80 characters
-// Normalized (format 2) review.
+// A review as Places::parse() delivers it.
 $r = fn (string $name, int $rating, string $date, ?string $text = null, ?string $id = null, mixed $url = null) =>
     ['id' => $id, 'name' => $name, 'date' => $date, 'rating' => $rating, 'text' => $text ?? $long, 'source' => 'google', 'url' => $url];
-// Legacy (format 1) review as scripts/bewertungen-holen.py wrote it.
-$legacy = fn (string $name, int $stars, string $date, ?string $text = null, ?string $link = null) =>
-    array_filter(['name' => $name, 'datum' => $date, 'sterne' => $stars, 'text' => $text ?? $long, 'quelle' => 'google', 'link' => $link], fn ($v) => $v !== null);
 $rules = Reviews::defaultRules();
 
 try {
     I18n::setLanguage('en');
     expect([5, 80, 24, 3, 280, null], array_slice(array_values($rules), 0, 6), 'selection defaults are the pre-1.0 constants');
-    expect(7, $rules['maxAgeDays'], 'the data file may be 7 days old by default');
-    expect(null, $rules['placeId'], 'no expected place by default');
+    expect(null, $rules['placeId'], 'no place by default');
+    expect(false, array_key_exists('maxAgeDays', $rules), 'no file, so no file age');
 
     // 4 stars, too short, too old, blank text fall out.
     $out = Reviews::select([
@@ -109,100 +95,20 @@ try {
     expect('https://www.google.com/maps/place/?q=place_id:ChIJExample-Place_ID0', Reviews::profileUrl('ChIJExample-Place_ID0'), 'profile URL');
     expect(true, Reviews::profileUrl('') === null && Reviews::profileUrl(null) === null && Reviews::profileUrl('a b"<') === null, 'profile URL without/invalid id');
 
-    // Files: missing, empty, broken, no rating → null.
-    expect(null, Reviews::load('/does/not/exist.json', $rules, $today, $problem), 'missing file');
-    expect(null, $problem, 'missing file: no problem to report, the page is simply empty');
-    expect(null, Reviews::load('', $rules, $today), 'empty path');
-    $f = tempnam(sys_get_temp_dir(), 'koe');
-    $files[] = $f;
-    expect(null, Reviews::load($f, $rules, $today), 'empty file');
-    file_put_contents($f, '{broken');
-    expect(null, Reviews::load($f, $rules, $today), 'broken JSON');
-    // An answer without any review text is a valid state, not a broken file: rating and count are kept.
-    expect(['rating' => 4.8, 'count' => 9, 'placeId' => null, 'reviews' => [], 'limit' => 3], Reviews::load($tmpFile(['format' => 2, 'rating' => 4.8, 'count' => 9, 'reviews' => []]), $rules, $today), 'empty list: rating and count, no reviews');
-    expect(null, Reviews::load($tmpFile(['format' => 2, 'rating' => null, 'count' => 0, 'reviews' => []]), $rules, $today), 'empty list without a rating (place has no reviews at all): nothing');
-    expect(null, Reviews::load($tmpFile(['format' => 2, 'count' => 9, 'reviews' => [$r('X', 5, '2026-09-01')]]), $rules, $today), 'no rating');
+    // filter(): the raw entries that pass the rules, newest first, at most maxCount, untruncated —
+    // what the cache keeps. select() on them gives the same result as select() on all of them.
+    $pool = [$r('Old', 5, '2024-01-01'), $r('A', 5, '2026-03-01', null, 'id-a'), $r('Four', 4, '2026-09-01'), $r('B', 5, '2026-09-02', $wall, 'id-b'), $r('C', 5, '2026-05-01'), $r('D', 5, '2026-01-01')];
+    $kept = Reviews::filter($pool, $rules, $today);
+    expect(['B', 'C', 'A'], array_column($kept, 'name'), 'filter: rules, newest first, maxCount');
+    expect($wall, $kept[0]['text'], 'filter: text kept whole (truncated only when shown)');
+    expect('google', $kept[0]['source'], 'filter: entries stay as they came');
+    expect(Reviews::select($pool, $rules, $today), Reviews::select($kept, $rules, $today), 'select() on the filtered entries = select() on all');
+    expect(['B'], array_column(Reviews::filter($pool, ['approved' => ['id-b']], $today), 'name'), 'filter: approved list');
+    expect([], Reviews::filter([], $rules, $today), 'filter: nothing in, nothing out');
 
-    // Format 2: rating and count only when no single review fits; place id passed through.
-    $g = Reviews::load($tmpFile(['format' => 2, 'placeId' => 'ChIJFile', 'rating' => 4.7, 'count' => 42, 'reviews' => [$r('Four', 4, '2026-09-01')]]), $rules, $today);
-    expect(['rating' => 4.7, 'count' => 42, 'placeId' => 'ChIJFile', 'reviews' => [], 'limit' => 3], $g, 'rating and count only');
-    $g = Reviews::load($tmpFile(['format' => 2, 'rating' => 4.9, 'count' => 7, 'reviews' => [$r('One', 5, '2026-09-01', null, 'id-1')]]), $rules, $today);
-    expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'One' && $g['reviews'][0]['id'] === 'id-1' && $g['placeId'] === null, 'load with one review, no place id');
-
-    // Format field: 1 and 2 are read, with or without the field; any other value is refused and logged.
-    $logFile = tempnam(sys_get_temp_dir(), 'koelog');
-    $files[] = $logFile;
-    ini_set('error_log', $logFile);
-    $g = Reviews::load($tmpFile(['rating' => 4.7, 'count' => 42, 'reviews' => [$r('NoField', 5, '2026-09-01', null, 'id-2')]]), $rules, $today);
-    expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'NoField', 'format 2 without format field is read');
-    $g = Reviews::load($tmpFile(['format' => 2, 'rating' => 4.7, 'count' => 42, 'reviews' => [$r('Explicit', 5, '2026-09-01', null, 'id-3')]]), $rules, $today);
-    expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'Explicit', 'format 2 with format field is read');
-    expect('', (string) file_get_contents($logFile), 'readable formats log nothing');
-    $future = ['format' => 3, 'placeId' => 'ChIJFile', 'rating' => 4.7, 'count' => 42, 'fetchedAt' => '2026-10-05', 'reviews' => [$r('Future', 5, '2026-09-01', null, 'id-4')]];
-    expect(null, Reviews::load($tmpFile($future), $rules, $today), 'format 3 with format 2 keys: section stays empty');
-    expect(null, Reviews::normalize(['format' => 0, 'rating' => 4.7, 'reviews' => [$r('Zero', 5, '2026-09-01')]]), 'format 0 refused');
-    expect(true, str_contains((string) file_get_contents($logFile), 'koe: unknown data file format 3'), 'unknown format is logged with its value');
-    ini_restore('error_log');
-
-    // Format 1 (the pre-1.0 file): German keys read as before, no ids, no place id.
-    $old = ['stand' => '2026-10-04', 'hinweis' => '…', 'gesamtwertung' => 4.8, 'anzahl' => 201, 'bewertungen' => [
-        $legacy('Mit Link', 5, '2026-09-01', null, 'https://maps.google.com/?cid=42'),
-        $legacy('Ohne Link', 5, '2026-08-01'),
-        $legacy('Böse', 5, '2026-07-01', null, 'javascript:alert(1)'),
-        $legacy('Vier', 4, '2026-09-05'),
-        $legacy('Kurz', 5, '2026-09-06', 'Top!'),
-    ]];
-    $g = Reviews::load($tmpFile($old), $rules, $today);
-    expect(4.8, $g['rating'], 'legacy rating');
-    expect(201, $g['count'], 'legacy count');
-    expect(null, $g['placeId'], 'legacy has no place id');
-    expect(['Mit Link', 'Ohne Link', 'Böse'], array_column($g['reviews'], 'name'), 'legacy selection identical to the old rules');
-    expect(['https://maps.google.com/?cid=42', null, null], array_column($g['reviews'], 'url'), 'legacy links');
-    expect([null, null, null], array_column($g['reviews'], 'id'), 'legacy reviews have no ids');
-    $n = Reviews::normalize($old);
-    expect(1, $n['format'], 'legacy detected as format 1');
-    expect('2026-10-04', $n['fetchedAt'], 'legacy fetch date');
-    expect([9, []], [Reviews::normalize(['gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => []])['count'], Reviews::normalize(['gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => []])['reviews']], 'legacy empty list is a valid state too');
-    expect(5, Reviews::normalize(['gesamtwertung' => 4.8, 'bewertungen' => [$legacy('A', 5, '2026-09-01'), 'junk', $legacy('B', 5, '2026-09-01'), $legacy('C', 5, '2026-09-01'), $legacy('D', 5, '2026-09-01'), $legacy('E', 5, '2026-09-01')]])['count'], 'legacy count falls back to the list length, junk ignored');
-
-    // Freshness: the day of the last successful fetch (checkedAt) decides; $today is 2026-10-05, the limit 7 days.
-    $stale = function (array $data, array $withRules = []) use ($tmpFile, $rules, $today, $r): array {
-        if (!isset($data['bewertungen'])) {
-            $data += ['format' => 2, 'rating' => 4.8, 'count' => 9, 'reviews' => [$r('Fresh', 5, '2026-09-01')]];
-        }
-        $loaded = Reviews::load($tmpFile($data, false), $withRules + $rules, $today, $problem);
-        return [$loaded !== null, $problem];
-    };
-    expect([true, null], $stale(['checkedAt' => '2026-10-05']), 'checked today: shown');
-    expect([true, null], $stale(['checkedAt' => '2026-09-28']), 'checked 7 days ago: shown (limit is inclusive)');
-    expect([false, 'the data file was last checked on 2026-09-27 (8 days ago, koe.maxAgeDays is 7)'], $stale(['checkedAt' => '2026-09-27']), 'checked 8 days ago: hidden, reason names date and limit');
-    expect([true, null], $stale(['fetchedAt' => '2026-08-01', 'checkedAt' => '2026-10-04']), 'content unchanged since August, but checked yesterday: shown (checkedAt, not fetchedAt)');
-    expect([true, null], $stale(['fetchedAt' => '2026-10-01']), 'file from before checkedAt: fetchedAt counts');
-    expect(false, $stale(['fetchedAt' => '2026-09-20'])[0], 'file from before checkedAt, fetched 15 days ago: hidden');
-    expect([true, null], $stale(['stand' => '2026-10-04', 'gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => [$legacy('Alt', 5, '2026-09-01')]]), 'format 1: stand counts as the check day');
-    expect(false, $stale(['stand' => '2026-09-01', 'gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => [$legacy('Alt', 5, '2026-09-01')]])[0], 'format 1 with an old stand: hidden');
-    [$shown, $why] = $stale([]);
-    expect(false, $shown, 'no date at all: hidden');
-    expect(true, str_contains((string) $why, 'age is unknown'), 'no date: the reason says the age is unknown');
-    expect(false, $stale(['checkedAt' => 'yesterday', 'fetchedAt' => '2026-02-30'])[0], 'unparsable dates are no dates');
-    expect([true, null], $stale(['checkedAt' => 'yesterday', 'fetchedAt' => '2026-10-03']), 'unparsable checkedAt: fetchedAt counts');
-    expect([true, null], $stale(['checkedAt' => '2026-10-06']), 'a check day in the future (clock skew) is not stale');
-    expect([true, null], $stale(['checkedAt' => '2026-09-15'], ['maxAgeDays' => 30]), 'maxAgeDays 30 lets a 20 day old file through');
-    expect(false, $stale(['checkedAt' => '2026-10-02'], ['maxAgeDays' => 2])[0], 'maxAgeDays 2 hides a 3 day old file');
-    expect(false, $stale(['format' => 2, 'checkedAt' => '2026-10-02', 'reviews' => []] + ['rating' => 4.8], ['maxAgeDays' => 2])[0], 'an empty review list does not make a stale file fresh');
-
-    // Identity: with an expected place id (koe.placeId) the file must be about that place.
-    $placeFile = $tmpFile(['format' => 2, 'placeId' => 'ChIJExampleOne', 'rating' => 4.8, 'count' => 9, 'reviews' => [$r('Own', 5, '2026-09-01')]]);
-    expect(['Own'], array_column(Reviews::load($placeFile, ['placeId' => 'ChIJExampleOne'] + $rules, $today, $problem)['reviews'], 'name'), 'expected place equals the file: shown');
-    expect(null, $problem, 'expected place equals the file: no problem');
-    expect(null, Reviews::load($placeFile, ['placeId' => 'ChIJExampleTwo'] + $rules, $today, $problem), 'expected place differs from the file: nothing');
-    expect(true, str_starts_with((string) $problem, 'the data file is about place ChIJExampleOne, but koe.placeId is ChIJExampleTwo'), 'place mismatch: the reason names both ids');
-    expect(true, Reviews::load($placeFile, $rules, $today) !== null, 'no expected place: the file is taken as it is');
-    expect(null, Reviews::load($placeFile, ['placeId' => 'chijexampleone'] + $rules, $today), 'place ids are compared exactly');
-    $noId = $tmpFile(['format' => 2, 'rating' => 4.8, 'count' => 9, 'reviews' => [$r('Old copy', 5, '2026-09-01')]]);
-    expect(true, Reviews::load($noId, ['placeId' => 'ChIJExampleTwo'] + $rules, $today, $problem) !== null && $problem === null, 'a file without a recorded place id cannot be checked and is taken as it is');
-    expect(null, Reviews::load($tmpFile(['format' => 2, 'placeId' => 'ChIJExampleOne', 'checkedAt' => '2026-09-01', 'rating' => 4.8, 'count' => 9, 'reviews' => []]), ['placeId' => 'ChIJExampleOne'] + $rules, $today, $problem), 'right place but too old: still nothing');
-    expect(true, str_contains((string) $problem, 'last checked on 2026-09-01'), 'right place but too old: the reason is the age');
+    // The avatar key travels with the review; without one it is null.
+    $out = Reviews::select([$r('Pic', 5, '2026-09-01') + ['avatar' => 'abc123'], $r('NoPic', 5, '2026-09-02')], $rules, $today);
+    expect(['NoPic' => null, 'Pic' => 'abc123'], array_column($out, 'avatar', 'name'), 'avatar key passed through');
 
     // The notice for visitors is worded from the rules in force, not fixed text.
     $totals = ' The rating and the number of reviews refer to all reviews on Google.';
@@ -222,7 +128,7 @@ try {
     foreach (['minRating' => 3, 'minLength' => 10, 'maxAgeMonths' => 6, 'maxCount' => 9, 'approved' => ['x']] as $rule => $value) {
         expect(true, Reviews::notice([$rule => $value] + $rules) !== Reviews::notice($rules), "notice changes with the rule $rule");
     }
-    expect(Reviews::notice($rules), Reviews::notice(['truncate' => 0, 'maxAgeDays' => 1, 'placeId' => 'x'] + $rules), 'rules that do not select reviews do not change the notice');
+    expect(Reviews::notice($rules), Reviews::notice(['truncate' => 0, 'placeId' => 'x'] + $rules), 'rules that do not select reviews do not change the notice');
 
     // German month names when the language is German.
     I18n::setLanguage('de');
@@ -237,6 +143,4 @@ try {
 } catch (Throwable $e) {
     fwrite(STDERR, 'Koe reviews: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine() . "\n");
     exit(1);
-} finally {
-    array_map('unlink', $files);
 }

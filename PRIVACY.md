@@ -7,45 +7,54 @@ the legal basis and the wording for their own site.
 
 ## What the visitor's browser does
 
-Nothing towards Google. The page shows a copy of the reviews that was fetched
-on the server. No script, embed, font or image is loaded from Google; the
-"Google Maps" logo, if shown, is served from the site's own server. Only when
-a visitor clicks the author name, the profile link or the "read all" link does
-the browser open Google Maps — a normal outbound link.
+Nothing towards Google. The page shows reviews that the site's own server
+fetched and keeps in a short-lived cache. No script, embed, font or image is
+loaded from Google; the reviewers' profile pictures and the "Google Maps"
+logo, if shown, are served from the site's own server. Only when a visitor
+clicks a reviewer, the profile link or the "read all" link does the browser
+open Google Maps — a normal outbound link.
 
 The plugin sets no cookies, uses no browser storage and records nothing about
 the visitor.
 
 ## What is fetched from Google, and when
 
-Once a night (or when started by hand), the fetch sends two requests to the
-Places API (New) from a CI runner or a server, authenticated with the site's
-own API key: a text search for the business, then the details of the found
-place. The request carries the business name and address, never visitor data.
+When a page shows the reviews and the cache holds none (the first time, and
+after the holding time ran out), the web server sends one request to the
+Places API (New), authenticated with the site's own API key: the details of
+the configured place. The request carries the place id and a language code,
+never visitor data. It is sent after the page was delivered to that visitor,
+who sees the page without reviews; the visitors after them see the reviews.
+The server then fetches the profile pictures of the reviews it keeps, from
+Google's image server, without the key and without visitor data.
 
-Received and stored: the place id, the overall rating, the number of reviews,
-and up to five reviews (the API's maximum) with author display name, author
-profile URL, link to the review on Google Maps, publication date, star rating,
-review text and Google's review id. Reviews without text are not stored.
+Received: the place id, the overall rating, the number of reviews, and up to
+five reviews (the API's maximum) with author display name, author profile
+and picture addresses, link to the review on Google Maps, publication date,
+star rating, review text and Google's review id.
 
-## Where it is stored, and for how long
+## What is kept, where, and for how long
 
-In one JSON file inside the site (`site/data/reviews.json` by default): in the
-site's repository, where the nightly run commits it, and on the web server,
-where the deploy puts it. The file is outside the web root and not reachable
-through the web.
+Only in the cache of the web server (Kirby's cache directory, by default
+`site/cache/`): the place id, the rating, the number of reviews, and of the
+reviews only those that pass the configured rules and are shown (by default
+at most three) with display name, date, stars, text, link to the review and
+the profile picture itself. Reviews that are not shown, the author profile
+addresses and Google's picture addresses are discarded right away. The cache
+is not in the site's repository, not in the content, not reachable through
+the web except the pictures at `/koe/avatar/<key>` while they are shown, and
+should be excluded from backups.
 
-Every successful run **replaces the file completely** with the current
-answer, also when that answer contains no review text (the page then shows
-only rating and count). There is no archive: a review Google no longer
-returns — withdrawn by its author, removed by Google, pushed out by newer
-ones — disappears from the file and the page with the next successful run,
-usually within a day. This follows Google's requirement not to cache Places
-content for longer than about 24 hours. If runs fail (quota, revoked key,
-outage), the file stays as it is, and the page stops showing it once the last
-successful run is older than `koe.maxAgeDays` (7 days by default). The
-repository history keeps earlier versions of the file; operators who want
-withdrawn reviews gone from history as well must handle that in git.
+Everything in the cache expires after the holding time (`koe.cacheHours`,
+24 hours by default, shorter if configured) and is deleted with the next
+page view after that. Every fetch empties the cache completely before it
+writes the new answer, also when that answer contains no review text (the
+page then shows only rating and count). There is no archive: a review Google
+no longer returns — withdrawn by its author, removed by Google, pushed out by
+newer ones — is gone from the site with the next fetch, at the latest one
+holding time after it was fetched. If a fetch fails (quota, revoked key,
+outage), the cache stays empty and the page shows no reviews; the next
+attempt follows 15 minutes later at the earliest.
 
 ## What is shown
 
@@ -53,20 +62,20 @@ Rating and count always. Of the single reviews only those that pass the
 configured rules (by default five stars, at least 80 characters, not older
 than 24 months, the three newest, cut at a word boundary after 280 characters
 with an ellipsis) and, if an approved list is configured, only those ids. The
-author is named and the name links to the review on Google Maps; without a
-safe (`http(s)`) link the name is plain text. The "Google Maps" attribution
-is always shown.
+author is named with profile picture; name and picture link to the review on
+Google Maps, without a safe (`http(s)`) link they are not linked. The
+"Google Maps" attribution and a notice on how the reviews were selected are
+always shown with them.
 
 The review authors are Google users whose reviews are already public on
-Google Maps. The page republishes name, date, rating and (possibly shortened)
-text of selected reviews. The nightly replacement means a review that is
-withdrawn on Google leaves the site within about a day of the next successful
-run.
+Google Maps. The page republishes name, picture, date, rating and (possibly
+shortened) text of selected reviews.
 
 ## The API key
 
-Lives only where the fetch runs (a repository secret or a server
-environment), never in the Kirby configuration and never on the web server.
-It is never printed; error messages from Google are scrubbed of it. The
-recommendation is one Google Cloud project per client with the key restricted
-to the Places API (New) and a capped daily quota.
+Lives on the web server: in a Kirby option (from a configuration file that
+is not in the repository) or in an environment variable. It is never sent to
+the browser and never printed; error messages from Google are scrubbed of
+it. The recommendation is one Google Cloud project per client with the key
+restricted to the Places API (New), if possible to the server's IP address,
+and a capped daily quota.
