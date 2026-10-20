@@ -105,7 +105,13 @@ final class Plugin
         return $problem;
     }
 
-    /** The route `koe/avatar/<key>`: a cached profile picture, or 404. */
+    /**
+     * The route `koe/avatar/<key>`: a cached profile picture, or 404. The
+     * browser may keep it only as long as the cache. `Expires` is sent next
+     * to `max-age` because Apache's mod_expires leaves a response alone that
+     * already has one; otherwise a site's `ExpiresByType image/png "access
+     * plus 1 year"` would add a year to the picture.
+     */
     public static function avatar(App $kirby, string $id): Response
     {
         $picture = Options::get($kirby, 'active', false) === true
@@ -116,6 +122,7 @@ final class Plugin
         }
         return new Response($picture['body'], $picture['type'], 200, [
             'Cache-Control' => 'public, max-age=' . max(0, $picture['expires'] - time()),
+            'Expires' => gmdate('D, d M Y H:i:s', max(time(), $picture['expires'])) . ' GMT',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }

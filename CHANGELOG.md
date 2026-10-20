@@ -12,6 +12,16 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [2.0.1] — 2026-10-20
+
+### Fixed
+
+- **Profile pictures could be kept by browsers for a year.** A site whose
+  `.htaccess` sets `ExpiresByType image/png "access plus 1 year"` (mod_expires)
+  added its own `Expires` and `max-age` to `/koe/avatar/…`. The route now also
+  sends `Expires` for the end of the holding time, and mod_expires leaves a
+  response with one alone.
+
 ## [2.0.0] — 2026-10-20
 
 Koe keeps no data file anymore. The site fetches the reviews itself into a
