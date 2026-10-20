@@ -12,7 +12,7 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
-## [Unreleased]
+## [2.0.0] — 2026-10-20
 
 Koe keeps no data file anymore. The site fetches the reviews itself into a
 short-lived cache, when a page needs them.
