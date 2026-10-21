@@ -109,9 +109,9 @@ The strings of the default snippet are also registered as Kirby translations (`t
 
 Google's Places policies ask for a clear notice on how reviews are filtered and ordered. The default snippet prints one below the single reviews (`<p class="koe-notice">`), built from the options actually in force, so it cannot go out of date when the configuration changes. With the defaults it reads (German sites get the German text):
 
-> Selection of the reviews shown: 5 stars, at least 80 characters of text, not older than 24 months. Newest first, at most 3. The rating and the number of reviews refer to all reviews on Google.
+> Selection: 5 stars, 80+ characters, at most 24 months old, newest first.
 
-It names `minRating` (not when it is `1`, which filters nothing), `minLength` (not when `0`), `maxAgeMonths`, an `approved` list ("approved by the business"), the order (newest first) and `maxCount`. Rating and count are Google's totals, which the last sentence says. There is no notice when no single review is shown. It cannot be switched off; for other wording use your own snippet. The text is also in `$r['notice']` (see below). The strings are the Kirby translations `koe.notice.*`.
+German: „Auswahl: 5 Sterne, ab 80 Zeichen, höchstens 24 Monate alt, neueste zuerst.“ It names `minRating` (not when it is `1`, which filters nothing), `minLength` (not when `0`), `maxAgeMonths`, an `approved` list ("approved by the business") and the order (newest first). `maxCount` is left out: visitors see how many reviews are shown. There is no notice when no single review is shown. It cannot be switched off; for other wording use your own snippet. The text is also in `$r['notice']` (see below). The strings are the Kirby translations `koe.notice.*`.
 
 ### Your own markup
 
@@ -121,7 +121,7 @@ Create `site/snippets/koe/reviews.php` (Kirby takes it before the package's snip
 $r = site()->koeReviews();   // null = show nothing
 // ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…', 'limit' => 3,
 //  'profileUrl' => 'https://www.google.com/maps/place/?q=place_id:…'|null,
-//  'notice' => 'Selection of the reviews shown: 5 stars, …',
+//  'notice' => 'Selection: 5 stars, …',
 //  'reviews' => [['id' => 'ChdD…'|null, 'name' => 'Anna B.', 'rating' => 5,
 //                 'text' => '…', 'date' => '2026-07-14', 'month' => 'July 2026',
 //                 'url' => 'https://www.google.com/maps/reviews/…'|null,

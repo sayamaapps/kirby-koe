@@ -301,7 +301,7 @@ try {
     // 13. The notice, worded from the options.
     $answer = ['id' => 'ChIJExample', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => [$review('Notice', '-3 days', null, 5, 'id-notice')]];
     $noticeOf = fn (string $html) => preg_match('~<p class="koe-notice">(.*?)</p>~s', $html, $m) ? $m[1] : null;
-    $defaultEn = 'Selection of the reviews shown: 5 stars, at least 80 characters of text, not older than 24 months. Newest first, at most 3. The rating and the number of reviews refer to all reviews on Google.';
+    $defaultEn = 'Selection: 5 stars, 80+ characters, at most 24 months old, newest first.';
     $fill($on);
     [$r, $html] = $run($on);
     expect($defaultEn, $noticeOf($html), 'default snippet: notice for the default options');
@@ -310,7 +310,7 @@ try {
     $strict = ['koe.minRating' => 4, 'koe.minLength' => 120, 'koe.maxAgeMonths' => 12, 'koe.maxCount' => 2] + $on;
     $fill($strict);
     [, $html] = $run($strict);
-    expect('Selection of the reviews shown: at least 4 stars, at least 120 characters of text, not older than 12 months. Newest first, at most 2. The rating and the number of reviews refer to all reviews on Google.', $noticeOf($html), 'notice follows the options');
+    expect('Selection: 4+ stars, 120+ characters, at most 12 months old, newest first.', $noticeOf($html), 'notice follows the options');
     holds(!str_contains(file_get_contents($base . '/snippets/reviews.php'), 'at least 80'), 'the snippet itself carries no fixed rule text');
 
     // 14. A site's own snippet wins over the package's default.

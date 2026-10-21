@@ -111,31 +111,29 @@ try {
     expect(['NoPic' => null, 'Pic' => 'abc123'], array_column($out, 'avatar', 'name'), 'avatar key passed through');
 
     // The notice for visitors is worded from the rules in force, not fixed text.
-    $totals = ' The rating and the number of reviews refer to all reviews on Google.';
-    expect('Selection of the reviews shown: 5 stars, at least 80 characters of text, not older than 24 months. Newest first, at most 3.' . $totals, Reviews::notice($rules), 'notice for the default rules');
+    expect('Selection: 5 stars, 80+ characters, at most 24 months old, newest first.', Reviews::notice($rules), 'notice for the default rules');
     expect(Reviews::notice($rules), Reviews::notice([]), 'notice without rules = the defaults');
-    expect('Selection of the reviews shown: at least 4 stars, at least 120 characters of text, not older than 12 months. Newest first, at most 5.' . $totals,
-        Reviews::notice(['minRating' => 4, 'minLength' => 120, 'maxAgeMonths' => 12, 'maxCount' => 5] + $rules), 'notice follows stars, length, age and count');
+    expect('Selection: 4+ stars, 120+ characters, at most 12 months old, newest first.',
+        Reviews::notice(['minRating' => 4, 'minLength' => 120, 'maxAgeMonths' => 12] + $rules), 'notice follows stars, length and age');
     expect(false, str_contains(Reviews::notice(['minRating' => 3] + $rules), '5 stars'), 'notice never says 5 stars when 3 are enough');
-    expect(true, str_contains(Reviews::notice(['minRating' => 3] + $rules), 'at least 3 stars'), 'minimum of 3 stars named');
+    expect(true, str_contains(Reviews::notice(['minRating' => 3] + $rules), '3+ stars'), 'minimum of 3 stars named');
     expect(false, str_contains(Reviews::notice(['minRating' => 1] + $rules), 'star'), 'minRating 1 is no filter: stars not mentioned');
     expect(false, str_contains(Reviews::notice(['minLength' => 0] + $rules), 'characters'), 'minLength 0 is no filter: length not mentioned');
-    expect(true, str_contains(Reviews::notice(['minLength' => 1] + $rules), 'at least 1 character of text'), 'singular for 1 character');
-    expect(true, str_contains(Reviews::notice(['maxAgeMonths' => 1] + $rules), 'not older than 1 month.'), 'singular for 1 month');
-    expect(true, str_contains(Reviews::notice(['maxCount' => 1] + $rules), 'Newest first, at most 1.'), 'count 1');
+    expect(true, str_contains(Reviews::notice(['minLength' => 1] + $rules), 'at least 1 character,'), 'singular for 1 character');
+    expect(true, str_contains(Reviews::notice(['maxAgeMonths' => 1] + $rules), 'at most 1 month old,'), 'singular for 1 month');
     expect(false, str_contains(Reviews::notice($rules), 'approved'), 'no approved list: nothing about approval');
-    expect(true, str_contains(Reviews::notice(['approved' => ['id-a']] + $rules), 'not older than 24 months, approved by the business.'), 'approved list: named as a criterion');
-    foreach (['minRating' => 3, 'minLength' => 10, 'maxAgeMonths' => 6, 'maxCount' => 9, 'approved' => ['x']] as $rule => $value) {
+    expect(true, str_contains(Reviews::notice(['approved' => ['id-a']] + $rules), 'at most 24 months old, approved by the business, newest first.'), 'approved list: named as a criterion');
+    foreach (['minRating' => 3, 'minLength' => 10, 'maxAgeMonths' => 6, 'approved' => ['x']] as $rule => $value) {
         expect(true, Reviews::notice([$rule => $value] + $rules) !== Reviews::notice($rules), "notice changes with the rule $rule");
     }
-    expect(Reviews::notice($rules), Reviews::notice(['truncate' => 0, 'placeId' => 'x'] + $rules), 'rules that do not select reviews do not change the notice');
+    expect(Reviews::notice($rules), Reviews::notice(['maxCount' => 9, 'truncate' => 0, 'placeId' => 'x'] + $rules), 'count, cut and place id do not change the notice');
 
     // German month names when the language is German.
     I18n::setLanguage('de');
     expect('September 2026', Reviews::select([$r('A', 5, '2026-09-01')], $rules, $today)[0]['month'], 'German month');
     expect('Google-Nutzer', Reviews::select([$r('', 5, '2026-09-01')], $rules, $today)[0]['name'], 'German anonymous label');
-    expect('Auswahl der angezeigten Bewertungen: 5 Sterne, mindestens 80 Zeichen Text, nicht älter als 24 Monate. Neueste zuerst, höchstens 3. Gesamtbewertung und Anzahl beziehen sich auf alle Bewertungen bei Google.', Reviews::notice($rules), 'German notice for the default rules');
-    expect('Auswahl der angezeigten Bewertungen: mindestens 4 Sterne, mindestens 1 Zeichen Text, nicht älter als 1 Monat, vom Betrieb freigegeben. Neueste zuerst, höchstens 2. Gesamtbewertung und Anzahl beziehen sich auf alle Bewertungen bei Google.',
+    expect('Auswahl: 5 Sterne, ab 80 Zeichen, höchstens 24 Monate alt, neueste zuerst.', Reviews::notice($rules), 'German notice for the default rules');
+    expect('Auswahl: ab 4 Sternen, ab 1 Zeichen, höchstens 1 Monat alt, vom Betrieb freigegeben, neueste zuerst.',
         Reviews::notice(['minRating' => 4, 'minLength' => 1, 'maxAgeMonths' => 1, 'maxCount' => 2, 'approved' => []] + $rules), 'German notice follows the rules, with an approved list');
     I18n::setLanguage('en');
 

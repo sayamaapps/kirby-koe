@@ -111,9 +111,10 @@ final class Reviews
      * cannot say "5 stars" on a site that lets 4 stars in). Plain text in the
      * current language (I18n), to be escaped by the template.
      *
-     * Covers the rules that decide which reviews appear: stars, text length,
-     * age, an approved list, the order and the maximum number. The rating and
-     * the count are Google's totals; the notice says so.
+     * Covers the rules that decide which reviews appear and in what order
+     * (stars, text length, age, an approved list, newest first), as Google's
+     * Places policies ask. Kept to one short sentence: the number shown is
+     * visible anyway, and rating and count stand next to Google's name.
      */
     public static function notice(array $rules): string
     {
@@ -135,11 +136,8 @@ final class Reviews
         if ($rules['approved'] !== null) {
             $criteria[] = I18n::t('notice.approved');
         }
-        return implode(' ', [
-            I18n::t('notice.selection', ['criteria' => implode(', ', $criteria)]),
-            I18n::t('notice.order', ['count' => $rules['maxCount']]),
-            I18n::t('notice.totals'),
-        ]);
+        $criteria[] = I18n::t('notice.order');
+        return I18n::t('notice.selection', ['criteria' => implode(', ', $criteria)]);
     }
 
     /**
