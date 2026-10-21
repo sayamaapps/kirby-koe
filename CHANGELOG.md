@@ -12,6 +12,19 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [2.1.0] — 2026-10-21
+
+### Changed
+
+- **Shorter notice on the selection.** One sentence instead of three:
+  „Auswahl: 5 Sterne, ab 80 Zeichen, höchstens 24 Monate alt, neueste
+  zuerst.“ / "Selection: 5 stars, 80+ characters, at most 24 months old,
+  newest first." It still names every filter and the order, as Google's Places
+  policies ask. Left out: the maximum number (visible anyway) and the sentence
+  that rating and count are Google's totals. The translation `koe.notice.totals`
+  is gone; `koe.notice.order` has no `{count}` anymore. Sites with their own
+  snippet that print `$r['notice']` get the new text without a change.
+
 ## [2.0.2] — 2026-10-20
 
 ### [privacy text]
