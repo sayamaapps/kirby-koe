@@ -54,7 +54,10 @@ final class Reviews
     public static function filter(array $reviews, array $rules, DateTimeImmutable $today): array
     {
         $rules += self::defaultRules();
-        $oldest = $today->modify('-' . $rules['maxAgeMonths'] . ' months')->format('Y-m-d');
+        // 0 = no age limit.
+        $oldest = $rules['maxAgeMonths'] > 0
+            ? $today->modify('-' . $rules['maxAgeMonths'] . ' months')->format('Y-m-d')
+            : null;
         $approved = $rules['approved'];
         $hits = [];
         foreach ($reviews as $review) {
@@ -67,7 +70,7 @@ final class Reviews
             if ((int) ($review['rating'] ?? 0) < $rules['minRating']
                 || mb_strlen($text) < $rules['minLength']
                 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
-                || $date < $oldest
+                || ($oldest !== null && $date < $oldest)
                 || ($approved !== null && ($id === null || !in_array($id, $approved, true)))) {
                 continue;
             }
@@ -130,9 +133,11 @@ final class Reviews
                 ? I18n::t('notice.length.one')
                 : I18n::t('notice.length', ['chars' => $rules['minLength']]);
         }
-        $criteria[] = $rules['maxAgeMonths'] === 1
-            ? I18n::t('notice.age.one')
-            : I18n::t('notice.age', ['months' => $rules['maxAgeMonths']]);
+        if ($rules['maxAgeMonths'] > 0) {
+            $criteria[] = $rules['maxAgeMonths'] === 1
+                ? I18n::t('notice.age.one')
+                : I18n::t('notice.age', ['months' => $rules['maxAgeMonths']]);
+        }
         if ($rules['approved'] !== null) {
             $criteria[] = I18n::t('notice.approved');
         }

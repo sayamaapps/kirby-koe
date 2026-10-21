@@ -12,6 +12,14 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [2.2.0] — 2026-10-21
+
+### Added
+
+- **`maxAgeMonths` 0 = no age limit.** Before, 0 let only reviews from today
+  through. Together with `minRating` 1 and `minLength` 0 a site can now show
+  every review Google returns. The notice then names no age.
+
 ## [2.1.0] — 2026-10-21
 
 ### Changed
