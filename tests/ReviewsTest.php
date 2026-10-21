@@ -43,6 +43,8 @@ try {
     // Age limit: exactly 24 months still in, one day older out.
     $out = Reviews::select([$r('Edge', 5, '2024-10-05'), $r('TooOld', 5, '2024-10-04')], $rules, $today);
     expect(['Edge'], array_column($out, 'name'), 'age limit 24 months');
+    $out = Reviews::select([$r('Ancient', 5, '2009-01-01')], ['maxAgeMonths' => 0] + $rules, $today);
+    expect(['Ancient'], array_column($out, 'name'), 'maxAgeMonths 0: no age limit');
 
     // Text is trimmed before the length check.
     expect([], Reviews::select([$r('Padded', 5, '2026-09-01', str_repeat(' ', 90) . 'short' . str_repeat(' ', 90))], $rules, $today), 'trim before length check');
@@ -121,6 +123,8 @@ try {
     expect(false, str_contains(Reviews::notice(['minLength' => 0] + $rules), 'characters'), 'minLength 0 is no filter: length not mentioned');
     expect(true, str_contains(Reviews::notice(['minLength' => 1] + $rules), 'at least 1 character,'), 'singular for 1 character');
     expect(true, str_contains(Reviews::notice(['maxAgeMonths' => 1] + $rules), 'at most 1 month old,'), 'singular for 1 month');
+    expect(false, str_contains(Reviews::notice(['maxAgeMonths' => 0] + $rules), 'old'), 'maxAgeMonths 0 is no filter: age not mentioned');
+    expect('Selection: newest first.', Reviews::notice(['minRating' => 1, 'minLength' => 0, 'maxAgeMonths' => 0] + $rules), 'no filter at all: only the order');
     expect(false, str_contains(Reviews::notice($rules), 'approved'), 'no approved list: nothing about approval');
     expect(true, str_contains(Reviews::notice(['approved' => ['id-a']] + $rules), 'at most 24 months old, approved by the business, newest first.'), 'approved list: named as a criterion');
     foreach (['minRating' => 3, 'minLength' => 10, 'maxAgeMonths' => 6, 'approved' => ['x']] as $rule => $value) {

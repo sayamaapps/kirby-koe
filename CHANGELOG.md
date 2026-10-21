@@ -14,6 +14,12 @@ All notable changes to this project are documented here. Versions follow
 
 ## [2.1.0] — 2026-10-21
 
+### Added
+
+- **`maxAgeMonths` 0 = no age limit.** Before, 0 let only reviews from today
+  through. Together with `minRating` 1 and `minLength` 0 a site can now show
+  every review Google returns. The notice then names no age.
+
 ### Changed
 
 - **Shorter notice on the selection.** One sentence instead of three:

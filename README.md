@@ -93,7 +93,7 @@ All keys are read as `koe.<name>`, flat or nested. `null` counts as "not set".
 | `cacheHours` | `24` | How long the cache holds the reviews and pictures, whole hours from `1` to `24`. After that the next page view fetches anew (and shows no reviews itself). |
 | `minRating` | `5` | Minimum stars. |
 | `minLength` | `80` | Minimum text length in characters (after trim). |
-| `maxAgeMonths` | `24` | Maximum age, counted from today (Europe/Berlin). |
+| `maxAgeMonths` | `24` | Maximum age, counted from today (Europe/Berlin). `0` = no limit. |
 | `maxCount` | `3` | Maximum number of single reviews shown; also the `limit` the snippet fills with the tile. |
 | `truncate` | `280` | Longer texts are cut at a word boundary with "…". `0` = never. |
 | `approved` | `null` | `null`: rules only. A list of review ids (from `koe-fetch`): only those, still subject to the rules above. `[]`: no single review, only rating, count and the tile. |
@@ -111,7 +111,7 @@ Google's Places policies ask for a clear notice on how reviews are filtered and 
 
 > Selection: 5 stars, 80+ characters, at most 24 months old, newest first.
 
-German: „Auswahl: 5 Sterne, ab 80 Zeichen, höchstens 24 Monate alt, neueste zuerst.“ It names `minRating` (not when it is `1`, which filters nothing), `minLength` (not when `0`), `maxAgeMonths`, an `approved` list ("approved by the business") and the order (newest first). `maxCount` is left out: visitors see how many reviews are shown. There is no notice when no single review is shown. It cannot be switched off; for other wording use your own snippet. The text is also in `$r['notice']` (see below). The strings are the Kirby translations `koe.notice.*`.
+German: „Auswahl: 5 Sterne, ab 80 Zeichen, höchstens 24 Monate alt, neueste zuerst.“ It names `minRating` (not when it is `1`, which filters nothing), `minLength` (not when `0`), `maxAgeMonths` (not when `0`), an `approved` list ("approved by the business") and the order (newest first). `maxCount` is left out: visitors see how many reviews are shown. There is no notice when no single review is shown. It cannot be switched off; for other wording use your own snippet. The text is also in `$r['notice']` (see below). The strings are the Kirby translations `koe.notice.*`.
 
 ### Your own markup
 
