@@ -1,6 +1,6 @@
 <?php
 /**
- * Selection rules, both file formats, approval, links and the profile URL —
+ * Selection rules, approval, links, the profile URL and the notice —
  * without Kirby.
  *   php tests/ReviewsTest.php
  */
@@ -17,26 +17,18 @@ function expect($expected, $actual, string $what): void
     if ($expected !== $actual) { throw new RuntimeException($what . ': ' . var_export($actual, true)); }
     $checks++;
 }
-$files = [];
-$tmpFile = function (array $data) use (&$files): string {
-    $file = tempnam(sys_get_temp_dir(), 'koe');
-    file_put_contents($file, json_encode($data));
-    return $files[] = $file;
-};
-
 $today = new DateTimeImmutable('2026-10-05', new DateTimeZone('Europe/Berlin'));
 $long = str_repeat('Very nice place, great food and friendly people. ', 2); // > 80 characters
-// Normalized (format 2) review.
+// A review as Places::parse() delivers it.
 $r = fn (string $name, int $rating, string $date, ?string $text = null, ?string $id = null, mixed $url = null) =>
     ['id' => $id, 'name' => $name, 'date' => $date, 'rating' => $rating, 'text' => $text ?? $long, 'source' => 'google', 'url' => $url];
-// Legacy (format 1) review as scripts/bewertungen-holen.py wrote it.
-$legacy = fn (string $name, int $stars, string $date, ?string $text = null, ?string $link = null) =>
-    array_filter(['name' => $name, 'datum' => $date, 'sterne' => $stars, 'text' => $text ?? $long, 'quelle' => 'google', 'link' => $link], fn ($v) => $v !== null);
 $rules = Reviews::defaultRules();
 
 try {
     I18n::setLanguage('en');
-    expect([5, 80, 24, 3, 280, null], array_values($rules), 'defaults are the pre-1.0 constants');
+    expect([5, 80, 24, 3, 280, null], array_slice(array_values($rules), 0, 6), 'selection defaults are the pre-1.0 constants');
+    expect(null, $rules['placeId'], 'no place by default');
+    expect(false, array_key_exists('maxAgeDays', $rules), 'no file, so no file age');
 
     // 4 stars, too short, too old, blank text fall out.
     $out = Reviews::select([
@@ -51,6 +43,8 @@ try {
     // Age limit: exactly 24 months still in, one day older out.
     $out = Reviews::select([$r('Edge', 5, '2024-10-05'), $r('TooOld', 5, '2024-10-04')], $rules, $today);
     expect(['Edge'], array_column($out, 'name'), 'age limit 24 months');
+    $out = Reviews::select([$r('Ancient', 5, '2009-01-01')], ['maxAgeMonths' => 0] + $rules, $today);
+    expect(['Ancient'], array_column($out, 'name'), 'maxAgeMonths 0: no age limit');
 
     // Text is trimmed before the length check.
     expect([], Reviews::select([$r('Padded', 5, '2026-09-01', str_repeat(' ', 90) . 'short' . str_repeat(' ', 90))], $rules, $today), 'trim before length check');
@@ -103,69 +97,52 @@ try {
     expect('https://www.google.com/maps/place/?q=place_id:ChIJExample-Place_ID0', Reviews::profileUrl('ChIJExample-Place_ID0'), 'profile URL');
     expect(true, Reviews::profileUrl('') === null && Reviews::profileUrl(null) === null && Reviews::profileUrl('a b"<') === null, 'profile URL without/invalid id');
 
-    // Files: missing, empty, broken, no reviews → null.
-    expect(null, Reviews::load('/does/not/exist.json', $rules, $today), 'missing file');
-    expect(null, Reviews::load('', $rules, $today), 'empty path');
-    $f = tempnam(sys_get_temp_dir(), 'koe');
-    $files[] = $f;
-    expect(null, Reviews::load($f, $rules, $today), 'empty file');
-    file_put_contents($f, '{broken');
-    expect(null, Reviews::load($f, $rules, $today), 'broken JSON');
-    expect(null, Reviews::load($tmpFile(['format' => 2, 'rating' => 4.8, 'count' => 9, 'reviews' => []]), $rules, $today), 'empty list');
-    expect(null, Reviews::load($tmpFile(['format' => 2, 'count' => 9, 'reviews' => [$r('X', 5, '2026-09-01')]]), $rules, $today), 'no rating');
+    // filter(): the raw entries that pass the rules, newest first, at most maxCount, untruncated —
+    // what the cache keeps. select() on them gives the same result as select() on all of them.
+    $pool = [$r('Old', 5, '2024-01-01'), $r('A', 5, '2026-03-01', null, 'id-a'), $r('Four', 4, '2026-09-01'), $r('B', 5, '2026-09-02', $wall, 'id-b'), $r('C', 5, '2026-05-01'), $r('D', 5, '2026-01-01')];
+    $kept = Reviews::filter($pool, $rules, $today);
+    expect(['B', 'C', 'A'], array_column($kept, 'name'), 'filter: rules, newest first, maxCount');
+    expect($wall, $kept[0]['text'], 'filter: text kept whole (truncated only when shown)');
+    expect('google', $kept[0]['source'], 'filter: entries stay as they came');
+    expect(Reviews::select($pool, $rules, $today), Reviews::select($kept, $rules, $today), 'select() on the filtered entries = select() on all');
+    expect(['B'], array_column(Reviews::filter($pool, ['approved' => ['id-b']], $today), 'name'), 'filter: approved list');
+    expect([], Reviews::filter([], $rules, $today), 'filter: nothing in, nothing out');
 
-    // Format 2: rating and count only when no single review fits; place id passed through.
-    $g = Reviews::load($tmpFile(['format' => 2, 'placeId' => 'ChIJFile', 'rating' => 4.7, 'count' => 42, 'reviews' => [$r('Four', 4, '2026-09-01')]]), $rules, $today);
-    expect(['rating' => 4.7, 'count' => 42, 'placeId' => 'ChIJFile', 'reviews' => [], 'limit' => 3], $g, 'rating and count only');
-    $g = Reviews::load($tmpFile(['format' => 2, 'rating' => 4.9, 'count' => 7, 'reviews' => [$r('One', 5, '2026-09-01', null, 'id-1')]]), $rules, $today);
-    expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'One' && $g['reviews'][0]['id'] === 'id-1' && $g['placeId'] === null, 'load with one review, no place id');
+    // The avatar key travels with the review; without one it is null.
+    $out = Reviews::select([$r('Pic', 5, '2026-09-01') + ['avatar' => 'abc123'], $r('NoPic', 5, '2026-09-02')], $rules, $today);
+    expect(['NoPic' => null, 'Pic' => 'abc123'], array_column($out, 'avatar', 'name'), 'avatar key passed through');
 
-    // Format field: 1 and 2 are read, with or without the field; any other value is refused and logged.
-    $logFile = tempnam(sys_get_temp_dir(), 'koelog');
-    $files[] = $logFile;
-    ini_set('error_log', $logFile);
-    $g = Reviews::load($tmpFile(['rating' => 4.7, 'count' => 42, 'reviews' => [$r('NoField', 5, '2026-09-01', null, 'id-2')]]), $rules, $today);
-    expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'NoField', 'format 2 without format field is read');
-    $g = Reviews::load($tmpFile(['format' => 2, 'rating' => 4.7, 'count' => 42, 'reviews' => [$r('Explicit', 5, '2026-09-01', null, 'id-3')]]), $rules, $today);
-    expect(true, $g !== null && count($g['reviews']) === 1 && $g['reviews'][0]['name'] === 'Explicit', 'format 2 with format field is read');
-    expect('', (string) file_get_contents($logFile), 'readable formats log nothing');
-    $future = ['format' => 3, 'placeId' => 'ChIJFile', 'rating' => 4.7, 'count' => 42, 'fetchedAt' => '2026-10-05', 'reviews' => [$r('Future', 5, '2026-09-01', null, 'id-4')]];
-    expect(null, Reviews::load($tmpFile($future), $rules, $today), 'format 3 with format 2 keys: section stays empty');
-    expect(null, Reviews::normalize(['format' => 0, 'rating' => 4.7, 'reviews' => [$r('Zero', 5, '2026-09-01')]]), 'format 0 refused');
-    expect(true, str_contains((string) file_get_contents($logFile), 'koe: unknown data file format 3'), 'unknown format is logged with its value');
-    ini_restore('error_log');
-
-    // Format 1 (the pre-1.0 file): German keys read as before, no ids, no place id.
-    $old = ['stand' => '2026-10-04', 'hinweis' => '…', 'gesamtwertung' => 4.8, 'anzahl' => 201, 'bewertungen' => [
-        $legacy('Mit Link', 5, '2026-09-01', null, 'https://maps.google.com/?cid=42'),
-        $legacy('Ohne Link', 5, '2026-08-01'),
-        $legacy('Böse', 5, '2026-07-01', null, 'javascript:alert(1)'),
-        $legacy('Vier', 4, '2026-09-05'),
-        $legacy('Kurz', 5, '2026-09-06', 'Top!'),
-    ]];
-    $g = Reviews::load($tmpFile($old), $rules, $today);
-    expect(4.8, $g['rating'], 'legacy rating');
-    expect(201, $g['count'], 'legacy count');
-    expect(null, $g['placeId'], 'legacy has no place id');
-    expect(['Mit Link', 'Ohne Link', 'Böse'], array_column($g['reviews'], 'name'), 'legacy selection identical to the old rules');
-    expect(['https://maps.google.com/?cid=42', null, null], array_column($g['reviews'], 'url'), 'legacy links');
-    expect([null, null, null], array_column($g['reviews'], 'id'), 'legacy reviews have no ids');
-    $n = Reviews::normalize($old);
-    expect(1, $n['format'], 'legacy detected as format 1');
-    expect('2026-10-04', $n['fetchedAt'], 'legacy fetch date');
-    expect(null, Reviews::normalize(['gesamtwertung' => 4.8, 'anzahl' => 9, 'bewertungen' => []]), 'legacy empty list');
-    expect(5, Reviews::normalize(['gesamtwertung' => 4.8, 'bewertungen' => [$legacy('A', 5, '2026-09-01'), 'junk', $legacy('B', 5, '2026-09-01'), $legacy('C', 5, '2026-09-01'), $legacy('D', 5, '2026-09-01'), $legacy('E', 5, '2026-09-01')]])['count'], 'legacy count falls back to the list length, junk ignored');
+    // The notice for visitors is worded from the rules in force, not fixed text.
+    expect('Selection: 5 stars, 80+ characters, at most 24 months old, newest first.', Reviews::notice($rules), 'notice for the default rules');
+    expect(Reviews::notice($rules), Reviews::notice([]), 'notice without rules = the defaults');
+    expect('Selection: 4+ stars, 120+ characters, at most 12 months old, newest first.',
+        Reviews::notice(['minRating' => 4, 'minLength' => 120, 'maxAgeMonths' => 12] + $rules), 'notice follows stars, length and age');
+    expect(false, str_contains(Reviews::notice(['minRating' => 3] + $rules), '5 stars'), 'notice never says 5 stars when 3 are enough');
+    expect(true, str_contains(Reviews::notice(['minRating' => 3] + $rules), '3+ stars'), 'minimum of 3 stars named');
+    expect(false, str_contains(Reviews::notice(['minRating' => 1] + $rules), 'star'), 'minRating 1 is no filter: stars not mentioned');
+    expect(false, str_contains(Reviews::notice(['minLength' => 0] + $rules), 'characters'), 'minLength 0 is no filter: length not mentioned');
+    expect(true, str_contains(Reviews::notice(['minLength' => 1] + $rules), 'at least 1 character,'), 'singular for 1 character');
+    expect(true, str_contains(Reviews::notice(['maxAgeMonths' => 1] + $rules), 'at most 1 month old,'), 'singular for 1 month');
+    expect(false, str_contains(Reviews::notice(['maxAgeMonths' => 0] + $rules), 'old'), 'maxAgeMonths 0 is no filter: age not mentioned');
+    expect('Selection: newest first.', Reviews::notice(['minRating' => 1, 'minLength' => 0, 'maxAgeMonths' => 0] + $rules), 'no filter at all: only the order');
+    expect(false, str_contains(Reviews::notice($rules), 'approved'), 'no approved list: nothing about approval');
+    expect(true, str_contains(Reviews::notice(['approved' => ['id-a']] + $rules), 'at most 24 months old, approved by the business, newest first.'), 'approved list: named as a criterion');
+    foreach (['minRating' => 3, 'minLength' => 10, 'maxAgeMonths' => 6, 'approved' => ['x']] as $rule => $value) {
+        expect(true, Reviews::notice([$rule => $value] + $rules) !== Reviews::notice($rules), "notice changes with the rule $rule");
+    }
+    expect(Reviews::notice($rules), Reviews::notice(['maxCount' => 9, 'truncate' => 0, 'placeId' => 'x'] + $rules), 'count, cut and place id do not change the notice');
 
     // German month names when the language is German.
     I18n::setLanguage('de');
     expect('September 2026', Reviews::select([$r('A', 5, '2026-09-01')], $rules, $today)[0]['month'], 'German month');
     expect('Google-Nutzer', Reviews::select([$r('', 5, '2026-09-01')], $rules, $today)[0]['name'], 'German anonymous label');
+    expect('Auswahl: 5 Sterne, ab 80 Zeichen, höchstens 24 Monate alt, neueste zuerst.', Reviews::notice($rules), 'German notice for the default rules');
+    expect('Auswahl: ab 4 Sternen, ab 1 Zeichen, höchstens 1 Monat alt, vom Betrieb freigegeben, neueste zuerst.',
+        Reviews::notice(['minRating' => 4, 'minLength' => 1, 'maxAgeMonths' => 1, 'maxCount' => 2, 'approved' => []] + $rules), 'German notice follows the rules, with an approved list');
     I18n::setLanguage('en');
 
     echo "Koe reviews: all $checks checks passed\n";
 } catch (Throwable $e) {
     fwrite(STDERR, 'Koe reviews: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine() . "\n");
     exit(1);
-} finally {
-    array_map('unlink', $files);
 }

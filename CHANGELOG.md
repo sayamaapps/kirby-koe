@@ -6,12 +6,180 @@ All notable changes to this project are documented here. Versions follow
 - **A change to the default selection rules** (which reviews are shown
   without configuration) is a **major** version: a site would show other
   voices after a routine update.
-- **A change to the data file format** increases `format` and ships with a
-  reader for the old format, so a site never shows nothing between the update
-  and the next nightly fetch.
+- **A change to what the cache holds** needs no reader for the old state:
+  the cache is fetched anew on the next page view.
 - A change to the privacy text (`DATENSCHUTZ.md` / `PRIVACY.md`) is marked
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
+
+## [2.2.0] — 2026-10-21
+
+### Added
+
+- **`maxAgeMonths` 0 = no age limit.** Before, 0 let only reviews from today
+  through. Together with `minRating` 1 and `minLength` 0 a site can now show
+  every review Google returns. The notice then names no age.
+
+## [2.1.0] — 2026-10-21
+
+### Changed
+
+- **Shorter notice on the selection.** One sentence instead of three:
+  „Auswahl: 5 Sterne, ab 80 Zeichen, höchstens 24 Monate alt, neueste
+  zuerst.“ / "Selection: 5 stars, 80+ characters, at most 24 months old,
+  newest first." It still names every filter and the order, as Google's Places
+  policies ask. Left out: the maximum number (visible anyway) and the sentence
+  that rating and count are Google's totals. The translation `koe.notice.totals`
+  is gone; `koe.notice.order` has no `{count}` anymore. Sites with their own
+  snippet that print `$r['notice']` get the new text without a change.
+
+## [2.0.2] — 2026-10-20
+
+### [privacy text]
+
+- `DATENSCHUTZ.md` / `PRIVACY.md` start with a short text block for the
+  privacy policy: what is shown, that viewing the page contacts no Google
+  server, what a click does and how to object. The technical details stay
+  below as background for questions, not for the policy itself. No code
+  change.
+
+## [2.0.1] — 2026-10-20
+
+### Fixed
+
+- **Profile pictures could be kept by browsers for a year.** A site whose
+  `.htaccess` sets `ExpiresByType image/png "access plus 1 year"` (mod_expires)
+  added its own `Expires` and `max-age` to `/koe/avatar/…`. The route now also
+  sends `Expires` for the end of the holding time, and mod_expires leaves a
+  response with one alone.
+
+## [2.0.0] — 2026-10-20
+
+Koe keeps no data file anymore. The site fetches the reviews itself into a
+short-lived cache, when a page needs them.
+
+### Changed (breaking)
+
+- **Fetch on demand into a cache instead of a nightly data file.** When a
+  page view finds no fitting reviews in the cache, it shows the section
+  without them and fetches after its response is sent (one Places request:
+  the details of `koe.placeId`); the views after it show them. The cache is
+  Kirby's plugin cache `sayamaapps.koe` (`site/cache/` by default): not in
+  git, not deployed, not in a backup of `content/` or `storage/`. Every fetch
+  empties it first; a failed fetch leaves it empty and is retried after
+  15 minutes at the earliest, and always logged (key scrubbed). The page
+  without reviews is not put into Kirby's page cache, a page with reviews not
+  longer than the reviews.
+- **Only what is shown is kept**: rating, count and the reviews that pass the
+  rules (at most `maxCount`). Other reviews, author profile addresses and
+  Google's picture addresses are discarded.
+- **The API key lives on the web server**: `koe.key` (string or closure) or
+  the environment variable `GOOGLE_PLACES_API_KEY` (`getenv()`, then
+  `$_SERVER`). Keep it out of git.
+- **`koe.placeId` is required**; without it nothing is shown or fetched. If
+  Google answers for another id, nothing is kept and the log names both ids.
+- **`koe-fetch` only shows** the place id and the reviews with their ids. It
+  writes nothing; `KOE_FILE`, `--file`, `KOE_PLACE_ID` and `--place-id` are
+  gone. The nightly workflow and the data file are no longer needed (see the
+  README, "Upgrading from 1.x").
+- **Removed:** the options `koe.file` and `koe.maxAgeDays`, reading the data
+  file (formats 1 and 2, the pre-1.0 `site/daten/bewertungen.json`
+  included), `checkedAt`/`fetchedAt`, and the argument of
+  `$site->koeProfileUrl()` (it uses `koe.placeId`).
+
+### Added
+
+- **`koe.cacheHours`** (default `24`, whole hours from `1` to `24`): how long
+  the cache holds reviews and pictures.
+- **Profile pictures** of the reviewers, fetched by the server without the
+  key into the same cache (JPEG, PNG, GIF or WebP up to 256 KB, checked by
+  content), served by the route `koe/avatar/<key>`. The default snippet shows
+  them in front of the name (`<img class="koe-avatar">`, 32 × 32, empty
+  `alt`); `koeReviews()` hands them as `avatar` to own snippets.
+
+### Fixed
+
+- **The link of a review is `googleMapsUri` only.** Without it the name was
+  linked to the author's Google profile page; now it is not linked.
+
+### [privacy text]
+
+- `PRIVACY.md` / `DATENSCHUTZ.md` describe the cache: fetch on demand from
+  the web server, only the shown reviews kept, holding time, pictures from
+  the own server, the key on the web server. The statement that Google allows
+  caching for about 24 hours is gone.
+- The README no longer recommends committing the reviews to git.
+
+## [1.1.0] — 2026-10-17
+
+### Fixed
+
+- **An answer without review texts is the current state.** 1.0.2 kept the old
+  data file when Google returned no usable review; withdrawn or removed
+  reviews, the old rating and the old count then stayed on the page, and the
+  fetch still exited with 0. `koe-fetch` now replaces the file with what Google
+  returns, an empty review list included. The page shows rating and count
+  without single reviews (`koeReviews()` is no longer `null` for an empty
+  list; only a missing rating, a missing file or an unreadable one still show
+  nothing).
+- A failed fetch (quota, revoked key, outage) left the file in place without
+  limit. The page now hides a file that is too old, see below.
+- **Reviews of one place could appear under the profile link of another.**
+  `koe.placeId` only set the profile link, while the fetch took the first hit
+  of the text search. `koe.placeId` is now the expected place. Rendering: if it
+  differs from the `placeId` in the data file, the page shows nothing and, in
+  debug mode, the log names both ids. The fetch: see `KOE_PLACE_ID` below. The
+  README claimed the option "pins" the place; it did not, now it does.
+
+### Added
+
+- **A notice on the selection in the default snippet.** Google's Places
+  policies ask for a clear notice on how reviews are ordered and filtered; the
+  snippet said nothing. It now prints `<p class="koe-notice">` below the single
+  reviews, worded from the options in force (`minRating`, `minLength`,
+  `maxAgeMonths`, `approved`, `maxCount`, newest first), in English or German
+  (`koe.notice.*` translations). Not a fixed label: it changes with the
+  configuration. Also in the result of `$site->koeReviews()` as `notice`; own
+  snippets should print it. The default selection rules are unchanged. Sites
+  with their own `site/snippets/koe/reviews.php` get no notice until they print
+  `$r['notice']`.
+- **`KOE_PLACE_ID`** / **`--place-id=`** for `koe-fetch`, the same value as
+  `koe.placeId`. If the search or the details lead to another place, the
+  fetch exits with `1`, prints both ids and writes nothing (the details of
+  the wrong place are not even requested when the search already differs).
+  Not set: the first hit is taken, as before. The id recorded in the file is
+  the one the details name.
+- **`checkedAt`** in the data file: the day of the last *successful* fetch,
+  set on every run, also when the content is unchanged. `fetchedAt` stays the
+  day the content last changed. Format stays 2; the field is optional and
+  older readers ignore it.
+- **`koe.maxAgeDays`** (default `7`, at least `1`): when `checkedAt` is older,
+  the page shows nothing and, in Kirby's debug mode, the PHP error log names
+  the dates. Files from before `checkedAt` fall back to `fetchedAt`; a file
+  without any valid date is treated as too old.
+
+### Changed
+
+- **The file is written on every new day.** With unchanged content only the
+  `checkedAt` line changes, so a workflow that commits and deploys "when the
+  file changed" now commits and deploys nightly (one line). That is intended: the
+  deployed file has to carry the day of the last successful fetch, otherwise
+  the page would hide itself after `koe.maxAgeDays`. A second run on the same
+  day still leaves the file alone.
+- **Upgrade order.** A site whose content has not changed for more than seven
+  days has a `fetchedAt` older than the new limit and no `checkedAt`: with the
+  new plugin and the old file the section disappears until the next fetch has
+  been committed and deployed. Run `koe-fetch` with the new version and deploy
+  the file first (or in the same deploy), or raise `koe.maxAgeDays` for the
+  update.
+- **`koe.placeId` can now hide the section.** A site whose option differs
+  from the place id in its data file (a typo, an old id, a deliberately
+  different profile link) shows nothing after the update. Check the `placeId`
+  in the file and set `KOE_PLACE_ID` in the workflow to the same value. A file
+  without a recorded place id (pre-1.0 format) cannot be checked and is shown.
+- **[privacy text]** `PRIVACY.md` / `DATENSCHUTZ.md`: an empty answer
+  replaces the stored copy, and a stored copy is shown for at most
+  `koe.maxAgeDays` after the last successful fetch.
 
 ## [1.0.2] — 2026-10-10
 

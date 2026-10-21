@@ -6,22 +6,16 @@ use DateTimeImmutable;
 use DateTimeZone;
 
 /**
- * The data file and the selection of what is shown.
+ * The selection of what is shown.
  *
- * The nightly fetch (bin/koe-fetch) stores every review Google returns,
- * with text. Which of them appear on the page is decided at render time by
- * the rules below (Options::rules(), defaults = the constants here). Kirby-
- * free, so tests/ReviewsTest.php can check it directly.
+ * The refresh (Store::refresh()) keeps only the reviews that pass the rules
+ * (filter()); the page selects again when it renders (select()), which adds
+ * the shortened text and the month. Kirby-free, so tests/ReviewsTest.php can
+ * check it directly.
  *
- * Two file formats are read:
- *
- * - format 2 (written by koe-fetch): `format`, `fetchedAt`, `placeId`,
- *   `rating`, `count`, `reviews[]` with `id`, `name`, `date`, `rating`,
- *   `text`, `source`, `url`, `authorUrl`.
- * - format 1, the file of the pre-1.0 copy (scripts/bewertungen-holen.py):
- *   `stand`, `gesamtwertung`, `anzahl`, `bewertungen[]` with `name`, `datum`,
- *   `sterne`, `text`, `quelle`, `link`, `autorLink`. No ids, no place id.
- *   It is rewritten in format 2 by the first fetch after the switch.
+ * A review, as Places::parse() delivers it: `id`, `name`, `date`, `rating`,
+ * `text`, optionally `url` (googleMapsUri) and, once the refresh has fetched
+ * the profile picture, `avatar` (its key in the cache).
  */
 final class Reviews
 {
@@ -37,33 +31,7 @@ final class Reviews
     /** Longer texts are cut at a word boundary. */
     public const TRUNCATE = 280;
 
-    public const FORMAT = 2;
-
-    /**
-     * Reads the file and selects the reviews to show.
-     *
-     * @return array{rating: float, count: int, placeId: ?string, reviews: list<array{id: ?string, name: string, rating: int, text: string, date: string, month: string, url: ?string}>, limit: int}|null
-     *         null when the file is missing, unreadable or has no reviews: the
-     *         page then shows nothing.
-     */
-    public static function load(string $file, array $rules = [], ?DateTimeImmutable $today = null): ?array
-    {
-        $data = self::read($file);
-        if ($data === null) {
-            return null;
-        }
-        $rules += self::defaultRules();
-        $today ??= new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
-        return [
-            'rating'  => $data['rating'],
-            'count'   => $data['count'],
-            'placeId' => $data['placeId'],
-            'reviews' => self::select($data['reviews'], $rules, $today),
-            'limit'   => $rules['maxCount'],
-        ];
-    }
-
-    /** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array} */
+    /** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, placeId:?string} */
     public static function defaultRules(): array
     {
         return [
@@ -73,86 +41,23 @@ final class Reviews
             'maxCount'     => self::MAX_COUNT,
             'truncate'     => self::TRUNCATE,
             'approved'     => null,
+            'placeId'      => null,
         ];
     }
 
     /**
-     * The file as format 2, whichever format it is in — or null when it is
-     * missing, unreadable, has no rating or no reviews.
+     * The reviews that pass the rules (rating, length, age, approval), newest
+     * first, at most `maxCount`, otherwise as they came: what the cache keeps.
      *
-     * @return array{format: int, fetchedAt: ?string, placeId: ?string, rating: float, count: int, reviews: list<array<string,mixed>>}|null
+     * @return list<array<string,mixed>>
      */
-    public static function read(string $file): ?array
-    {
-        if ($file === '' || !is_file($file)) {
-            return null;
-        }
-        $data = json_decode((string) file_get_contents($file), true);
-        return is_array($data) ? self::normalize($data) : null;
-    }
-
-    /** @return array{format: int, fetchedAt: ?string, placeId: ?string, rating: float, count: int, reviews: list<array<string,mixed>>}|null */
-    public static function normalize(array $data): ?array
-    {
-        // A format this reader does not know (a newer one, or a typo) is not
-        // guessed at: the section stays empty and the log names the format.
-        if (isset($data['format']) && !in_array($data['format'], [1, 2], true)) {
-            error_log('koe: unknown data file format ' . json_encode($data['format']) . ' (this version reads formats 1 and 2)');
-            return null;
-        }
-        $legacy = !isset($data['reviews']) && isset($data['bewertungen']);
-        $reviews = $legacy ? ($data['bewertungen'] ?? null) : ($data['reviews'] ?? null);
-        $rating = $legacy ? ($data['gesamtwertung'] ?? null) : ($data['rating'] ?? null);
-        if (!is_array($reviews) || $reviews === [] || !is_numeric($rating)) {
-            return null;
-        }
-        $count = $legacy ? ($data['anzahl'] ?? null) : ($data['count'] ?? null);
-        $list = [];
-        foreach ($reviews as $review) {
-            if (!is_array($review)) {
-                continue;
-            }
-            $list[] = $legacy ? [
-                'id'        => null,
-                'name'      => $review['name'] ?? '',
-                'date'      => $review['datum'] ?? '',
-                'rating'    => $review['sterne'] ?? 0,
-                'text'      => $review['text'] ?? '',
-                'source'    => $review['quelle'] ?? 'google',
-                'url'       => $review['link'] ?? null,
-                'authorUrl' => $review['autorLink'] ?? null,
-            ] : [
-                'id'        => isset($review['id']) ? (string) $review['id'] : null,
-                'name'      => $review['name'] ?? '',
-                'date'      => $review['date'] ?? '',
-                'rating'    => $review['rating'] ?? 0,
-                'text'      => $review['text'] ?? '',
-                'source'    => $review['source'] ?? 'google',
-                'url'       => $review['url'] ?? null,
-                'authorUrl' => $review['authorUrl'] ?? null,
-            ];
-        }
-        $placeId = $legacy ? null : ($data['placeId'] ?? null);
-        return [
-            'format'    => $legacy ? 1 : (int) ($data['format'] ?? self::FORMAT),
-            'fetchedAt' => $legacy ? ($data['stand'] ?? null) : ($data['fetchedAt'] ?? null),
-            'placeId'   => is_string($placeId) && $placeId !== '' ? $placeId : null,
-            'rating'    => (float) $rating,
-            'count'     => is_numeric($count) ? (int) $count : count($list),
-            'reviews'   => $list,
-        ];
-    }
-
-    /**
-     * Filters (rating, length, age, approval), sorts newest first, limits and
-     * truncates. Takes normalized reviews (see read()).
-     *
-     * @return list<array{id: ?string, name: string, rating: int, text: string, date: string, month: string, url: ?string}>
-     */
-    public static function select(array $reviews, array $rules, DateTimeImmutable $today): array
+    public static function filter(array $reviews, array $rules, DateTimeImmutable $today): array
     {
         $rules += self::defaultRules();
-        $oldest = $today->modify('-' . $rules['maxAgeMonths'] . ' months')->format('Y-m-d');
+        // 0 = no age limit.
+        $oldest = $rules['maxAgeMonths'] > 0
+            ? $today->modify('-' . $rules['maxAgeMonths'] . ' months')->format('Y-m-d')
+            : null;
         $approved = $rules['approved'];
         $hits = [];
         foreach ($reviews as $review) {
@@ -165,29 +70,83 @@ final class Reviews
             if ((int) ($review['rating'] ?? 0) < $rules['minRating']
                 || mb_strlen($text) < $rules['minLength']
                 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
-                || $date < $oldest
+                || ($oldest !== null && $date < $oldest)
                 || ($approved !== null && ($id === null || !in_array($id, $approved, true)))) {
                 continue;
             }
-            $hits[] = [
-                'id'     => $id,
-                'name'   => trim((string) ($review['name'] ?? '')) ?: I18n::t('author.anonymous'),
-                'rating' => (int) $review['rating'],
-                'text'   => self::truncate($text, $rules['truncate']),
-                'date'   => $date,
-                'month'  => I18n::monthYear($date),
-                // Link to the single review on Google Maps (Places policies:
-                // users must be able to reach it). Without one the name stays text.
-                'url'    => self::safeUrl($review['url'] ?? null),
-            ];
+            $hits[] = $review;
         }
-        usort($hits, fn ($a, $b) => strcmp($b['date'], $a['date']));
+        usort($hits, fn ($a, $b) => strcmp((string) $b['date'], (string) $a['date']));
         return array_slice($hits, 0, $rules['maxCount']);
     }
 
     /**
-     * Address of the Google profile from the place id (the place id may be
-     * stored). Without one, or with a nonsensical one, null: then the profile
+     * filter(), then what the page shows: trimmed and shortened text, the
+     * month, a safe link and the avatar key.
+     *
+     * @return list<array{id: ?string, name: string, rating: int, text: string, date: string, month: string, url: ?string, avatar: ?string}>
+     */
+    public static function select(array $reviews, array $rules, DateTimeImmutable $today): array
+    {
+        $rules += self::defaultRules();
+        $shown = [];
+        foreach (self::filter($reviews, $rules, $today) as $review) {
+            $avatar = $review['avatar'] ?? null;
+            $shown[] = [
+                'id'     => isset($review['id']) ? (string) $review['id'] : null,
+                'name'   => trim((string) ($review['name'] ?? '')) ?: I18n::t('author.anonymous'),
+                'rating' => (int) $review['rating'],
+                'text'   => self::truncate(trim((string) $review['text']), $rules['truncate']),
+                'date'   => (string) $review['date'],
+                'month'  => I18n::monthYear((string) $review['date']),
+                // Link to the single review on Google Maps (googleMapsUri). Without
+                // one the name stays text.
+                'url'    => self::safeUrl($review['url'] ?? null),
+                'avatar' => is_string($avatar) && $avatar !== '' ? $avatar : null,
+            ];
+        }
+        return $shown;
+    }
+
+    /**
+     * The notice for visitors: how the reviews shown were selected and in what
+     * order, worded from the rules actually in force (never a fixed text, so it
+     * cannot say "5 stars" on a site that lets 4 stars in). Plain text in the
+     * current language (I18n), to be escaped by the template.
+     *
+     * Covers the rules that decide which reviews appear and in what order
+     * (stars, text length, age, an approved list, newest first), as Google's
+     * Places policies ask. Kept to one short sentence: the number shown is
+     * visible anyway, and rating and count stand next to Google's name.
+     */
+    public static function notice(array $rules): string
+    {
+        $rules += self::defaultRules();
+        $criteria = [];
+        if ($rules['minRating'] >= 5) {
+            $criteria[] = I18n::t('notice.stars.exact', ['stars' => 5]);
+        } elseif ($rules['minRating'] > 1) {
+            $criteria[] = I18n::t('notice.stars.min', ['stars' => $rules['minRating']]);
+        }
+        if ($rules['minLength'] > 0) {
+            $criteria[] = $rules['minLength'] === 1
+                ? I18n::t('notice.length.one')
+                : I18n::t('notice.length', ['chars' => $rules['minLength']]);
+        }
+        if ($rules['maxAgeMonths'] > 0) {
+            $criteria[] = $rules['maxAgeMonths'] === 1
+                ? I18n::t('notice.age.one')
+                : I18n::t('notice.age', ['months' => $rules['maxAgeMonths']]);
+        }
+        if ($rules['approved'] !== null) {
+            $criteria[] = I18n::t('notice.approved');
+        }
+        $criteria[] = I18n::t('notice.order');
+        return I18n::t('notice.selection', ['criteria' => implode(', ', $criteria)]);
+    }
+
+    /**
+     * Address of the Google profile from the place id. Without one, or with a nonsensical one, null: then the profile
      * link and the "read all on Google" tile are omitted.
      */
     public static function profileUrl(?string $placeId): ?string
@@ -198,7 +157,7 @@ final class Reviews
             : null;
     }
 
-    /** Only http(s) addresses, otherwise null (no javascript: or the like from the file). */
+    /** Only http(s) addresses, otherwise null (no javascript: or the like from an answer). */
     public static function safeUrl(mixed $url): ?string
     {
         $url = is_string($url) ? trim($url) : '';

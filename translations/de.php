@@ -19,4 +19,14 @@ return [
     'readAll' => 'Alle auf Google lesen',
     'opensNewTab' => '(öffnet neuen Tab)',
     'author.anonymous' => 'Google-Nutzer',
+
+    'notice.selection' => 'Auswahl: {criteria}.',
+    'notice.stars.exact' => '{stars} Sterne',
+    'notice.stars.min' => 'ab {stars} Sternen',
+    'notice.length' => 'ab {chars} Zeichen',
+    'notice.length.one' => 'ab 1 Zeichen',
+    'notice.age' => 'höchstens {months} Monate alt',
+    'notice.age.one' => 'höchstens 1 Monat alt',
+    'notice.approved' => 'vom Betrieb freigegeben',
+    'notice.order' => 'neueste zuerst',
 ];

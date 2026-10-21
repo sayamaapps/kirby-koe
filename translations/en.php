@@ -20,4 +20,15 @@ return [
     'readAll' => 'Read all on Google',
     'opensNewTab' => '(opens in a new tab)',
     'author.anonymous' => 'Google user',
+
+    // The notice on how the reviews shown were selected, built by Reviews::notice() from the rules in force.
+    'notice.selection' => 'Selection: {criteria}.',
+    'notice.stars.exact' => '{stars} stars',
+    'notice.stars.min' => '{stars}+ stars',
+    'notice.length' => '{chars}+ characters',
+    'notice.length.one' => 'at least 1 character',
+    'notice.age' => 'at most {months} months old',
+    'notice.age.one' => 'at most 1 month old',
+    'notice.approved' => 'approved by the business',
+    'notice.order' => 'newest first',
 ];
