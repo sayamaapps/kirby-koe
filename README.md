@@ -25,12 +25,6 @@ Koe shows a business's Google rating, its review count and a few selected review
 composer require sayamaapps/kirby-koe
 ```
 
-Until the package is on Packagist, add the repository to `composer.json` first:
-
-```json
-"repositories": [{ "type": "vcs", "url": "https://github.com/sayamaapps/kirby-koe" }]
-```
-
 Composer installs to `site/plugins/koe/` and links the CLI as `vendor/bin/koe-fetch`. Add that path to `.gitignore` and deploy it like `vendor/`. Ignore `site/cache/` in git too, and leave it out of backups.
 
 ## Usage
