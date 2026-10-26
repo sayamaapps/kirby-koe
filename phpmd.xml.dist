@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
-<ruleset name="Noren"
+<ruleset name="Koe"
 	xmlns="http://pmd.sf.net/ruleset/1.0.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd"
 	xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
-	<description>PHP Mess Detector rules for Noren (TST-10). Every exclusion and raised threshold has its reason here.</description>
+	<description>PHP Mess Detector rules for Koe. Every exclusion and raised threshold has its reason here.</description>
 
 	<rule ref="rulesets/cleancode.xml">
 		<!-- The helper classes (Options, I18n, Log, Holidays) are static by design, as in Kirby's own code. -->

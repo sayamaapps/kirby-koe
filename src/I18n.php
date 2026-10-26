@@ -12,8 +12,14 @@ namespace Sayamaapps\Koe;
  *
  * The language is set once per request (index.php, from Options::language())
  * and defaults to English. Missing keys fall back to English, then to the key.
+ *
+ * @package   Kirby Koe
+ * @author    Simon Räder
+ * @link      https://github.com/sayamaapps/kirby-koe
+ * @copyright Simon Räder
+ * @license   https://opensource.org/licenses/MIT
  */
-final class I18n
+class I18n
 {
 	/** Languages Koe ships. English is the default and the fallback. */
 	public const LANGUAGES = ['en', 'de'];

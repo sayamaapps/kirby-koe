@@ -24,8 +24,14 @@ use Kirby\Cache\FileCache;
  * the whole cache, so nothing of an earlier answer survives it (a picture of
  * a review that is gone included). Kirby removes an expired entry when it is
  * read, which happens on the next page view.
+ *
+ * @package   Kirby Koe
+ * @author    Simon Räder
+ * @link      https://github.com/sayamaapps/kirby-koe
+ * @copyright Simon Räder
+ * @license   https://opensource.org/licenses/MIT
  */
-final class Store
+class Store
 {
 	public const DATA = 'reviews';
 
@@ -54,10 +60,11 @@ final class Store
 		}
 		$picture = $cache->get('avatar-' . $id);
 		$body = is_array($picture) ? base64_decode((string)($picture['body'] ?? ''), true) : false;
-		if ($body === false || self::type($body) === null) {
+		$type = $body === false ? null : self::type($body);
+		if ($body === false || $type === null) {
 			return null;
 		}
-		return ['type' => self::type($body), 'body' => $body, 'expires' => (int)$cache->expires('avatar-' . $id)];
+		return ['type' => $type, 'body' => $body, 'expires' => (int)$cache->expires('avatar-' . $id)];
 	}
 
 	/**
@@ -107,7 +114,7 @@ final class Store
 	public static function fingerprint(array $settings, array $rules): string
 	{
 		$rules += Reviews::defaultRules();
-		return md5(json_encode([
+		return md5((string)json_encode([
 			self::VERSION,
 			$settings['placeId'], $settings['language'], $settings['minutes'],
 			$rules['minRating'], $rules['minLength'], $rules['maxAgeMonths'], $rules['maxCount'], $rules['approved'],
@@ -128,7 +135,13 @@ final class Store
 		if (!$cache instanceof FileCache) {
 			return null;
 		}
-		$handle = @fopen($cache->root() . '.lock', 'c');
+		// A missing directory is reported by the null return, not by a warning.
+		set_error_handler(static fn (): bool => true);
+		try {
+			$handle = fopen($cache->root() . '.lock', 'c');
+		} finally {
+			restore_error_handler();
+		}
 		if ($handle === false) {
 			return null;
 		}
@@ -159,7 +172,7 @@ final class Store
 	 * The cached data, or null when there is none, it expired or it was
 	 * fetched for other settings.
 	 *
-	 * @return array{placeId: string, rating: ?float, count: int, reviews: list<array<string,mixed>>, expires: int}|null
+	 * @return array<string, mixed>|null
 	 */
 	public static function read(Cache $cache, string $fingerprint): array|null
 	{

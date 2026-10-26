@@ -17,8 +17,14 @@ use Kirby\Http\Response;
  * (fastcgi_finish_request() under PHP-FPM, litespeed_finish_request() under
  * LiteSpeed; elsewhere that one visitor waits for it). The views after it
  * show the reviews until the cache expires.
+ *
+ * @package   Kirby Koe
+ * @author    Simon Räder
+ * @link      https://github.com/sayamaapps/kirby-koe
+ * @copyright Simon Räder
+ * @license   https://opensource.org/licenses/MIT
  */
-final class Plugin
+class Plugin
 {
 	/** Kirby's cache for the plugin `sayamaapps/koe` (option `sayamaapps.koe.cache`). */
 	public const CACHE = 'sayamaapps.koe';
@@ -108,7 +114,7 @@ final class Plugin
 	 * Rating, count and the selected reviews, or null (= show nothing: no
 	 * place id, no key, nothing cached yet, or a place without rating).
 	 *
-	 * @return array{rating: float, count: int, placeId: string, reviews: list<array>, limit: int}|null
+	 * @return array{rating: float, count: int, placeId: string, reviews: array<int, array<string, mixed>>, limit: int}|null
 	 */
 	public static function reviews(App $kirby, array $rules): array|null
 	{
@@ -141,11 +147,11 @@ final class Plugin
 			$reviews[$i]['avatar'] = $review['avatar'] === null ? null : $kirby->url() . '/koe/avatar/' . $review['avatar'];
 		}
 		return [
-			'rating'  => $data['rating'],
-			'count'   => $data['count'],
+			'rating'  => (float)$data['rating'],
+			'count'   => (int)$data['count'],
 			'placeId' => $placeId,
 			'reviews' => $reviews,
-			'limit'   => $rules['maxCount'],
+			'limit'   => (int)$rules['maxCount'],
 		];
 	}
 

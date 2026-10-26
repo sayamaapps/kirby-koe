@@ -3,6 +3,7 @@
 namespace Sayamaapps\Koe;
 
 use Closure;
+use RuntimeException;
 
 /**
  * Places API (New): find the place by text, read rating, count and reviews,
@@ -15,8 +16,14 @@ use Closure;
  *
  * Errors are PlacesException with a message that never contains the request
  * or the key: only Google's status and message, or the transport failure.
+ *
+ * @package   Kirby Koe
+ * @author    Simon Räder
+ * @link      https://github.com/sayamaapps/kirby-koe
+ * @copyright Simon Räder
+ * @license   https://opensource.org/licenses/MIT
  */
-final class Places
+class Places
 {
 	/** Fields the details call asks for. `reviews` returns all sub-fields, including googleMapsUri. */
 	public const DETAILS_MASK = 'id,displayName,rating,userRatingCount,reviews';
@@ -63,6 +70,9 @@ final class Places
 		return function (string $url, array $headers, string|null $body) use ($timeout): array {
 			if (function_exists('curl_init')) {
 				$ch = curl_init($url);
+				if ($ch === false) {
+					throw new RuntimeException('curl could not start');
+				}
 				$options = [
 					CURLOPT_RETURNTRANSFER => true,
 					CURLOPT_HTTPHEADER => $headers,
@@ -82,7 +92,7 @@ final class Places
 				if ($response === false) {
 					$error = curl_error($ch);
 					curl_close($ch);
-					throw new \RuntimeException($error);
+					throw new RuntimeException($error);
 				}
 				$status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
 				curl_close($ch);
@@ -95,9 +105,19 @@ final class Places
 				'timeout' => $timeout,
 				'ignore_errors' => true,
 			]]);
-			$response = @file_get_contents($url, false, $context);
+			// Warnings are collected instead of silenced: the first one says why the request failed.
+			$warnings = [];
+			set_error_handler(static function (int $level, string $message) use (&$warnings): bool {
+				$warnings[] = [$level, $message];
+				return true;
+			});
+			try {
+				$response = file_get_contents($url, false, $context);
+			} finally {
+				restore_error_handler();
+			}
 			if ($response === false) {
-				throw new \RuntimeException(error_get_last()['message'] ?? 'request failed');
+				throw new RuntimeException($warnings === [] ? 'request failed' : $warnings[0][1]);
 			}
 			$status = 0;
 			foreach ($http_response_header ?? [] as $line) {
@@ -186,7 +206,7 @@ final class Places
 			'reviews' => $reviews,
 		];
 		$messages[] = count($reviews) . ' reviews with text; Google reports ' . $data['count']
-			. ' with an average of ' . ($data['rating'] ?? '?') . '.';
+			. ' with an average of ' . (string)($data['rating'] ?? '?') . '.';
 		return ['data' => $data, 'messages' => $messages];
 	}
 

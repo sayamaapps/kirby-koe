@@ -17,8 +17,14 @@ use Closure;
  *   3  no GOOGLE_PLACES_API_KEY
  *
  * The key is never printed. Google's error messages are scrubbed of it too.
+ *
+ * @package   Kirby Koe
+ * @author    Simon Räder
+ * @link      https://github.com/sayamaapps/kirby-koe
+ * @copyright Simon Räder
+ * @license   https://opensource.org/licenses/MIT
  */
-final class Fetch
+class Fetch
 {
 	public const ENV_KEY = 'GOOGLE_PLACES_API_KEY';
 	public const ENV_LANGUAGE = 'KOE_LANGUAGE';
@@ -75,13 +81,14 @@ final class Fetch
 			$places = new Places($transport ?? Places::defaultTransport(), $key);
 			$place = $places->search($query, $language);
 			fwrite($out, 'Found: ' . $place['name'] . ' (' . $place['id'] . ")\n");
-			$details = $places->details($place['id'], $language);
+			$placeId = (string)$place['id'];
+			$details = $places->details($placeId, $language);
 		} catch (PlacesException $e) {
 			fwrite($err, Places::scrub($e->getMessage(), $key) . "\n");
 			return self::EXIT_ERROR;
 		}
 
-		$placeId = trim((string)($details['id'] ?? '')) ?: $place['id'];
+		$placeId = trim((string)($details['id'] ?? '')) ?: $placeId;
 		['data' => $data, 'messages' => $messages] = Places::parse($details, $placeId, $today);
 		fwrite($out, implode("\n", $messages) . "\n");
 		if ($data['reviews'] === []) {

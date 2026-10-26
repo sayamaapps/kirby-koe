@@ -14,8 +14,14 @@ use Kirby\Cms\Helpers;
  *
  * Both spellings work, flat (`'sayamaapps.koe.active' => true`) and nested
  * (`'koe' => ['active' => true]`), because Kirby's option() finds both.
+ *
+ * @package   Kirby Koe
+ * @author    Simon Räder
+ * @link      https://github.com/sayamaapps/kirby-koe
+ * @copyright Simon Räder
+ * @license   https://opensource.org/licenses/MIT
  */
-final class Options
+class Options
 {
 	/** Holding time of the cache in hours: the default, and the longest allowed. */
 	public const CACHE_HOURS = 24;

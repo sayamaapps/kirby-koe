@@ -15,8 +15,14 @@ use DateTimeImmutable;
  * A review, as Places::parse() delivers it: `id`, `name`, `date`, `rating`,
  * `text`, optionally `url` (googleMapsUri) and, once the refresh has fetched
  * the profile picture, `avatar` (its key in the cache).
+ *
+ * @package   Kirby Koe
+ * @author    Simon Räder
+ * @link      https://github.com/sayamaapps/kirby-koe
+ * @copyright Simon Räder
+ * @license   https://opensource.org/licenses/MIT
  */
-final class Reviews
+class Reviews
 {
 	/** Maximum age in months, counted from "today" at render time. */
 	public const MAX_AGE_MONTHS = 24;
