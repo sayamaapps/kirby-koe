@@ -28,7 +28,7 @@ jobs:
         run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-req=ext-gd
 
       - name: Tests
-        run: sh tests/run.sh
+        run: vendor/bin/phpunit
 
       - name: The CLI runs without Kirby and without a key (exit 3)
         run: |
@@ -71,4 +71,4 @@ jobs:
           composer require --dev 'getkirby/cms:^6.0@beta' --with-all-dependencies --no-interaction --no-progress --prefer-dist --ignore-platform-req=ext-gd
 
       - name: Tests
-        run: sh tests/run.sh || echo "::warning title=Kirby 6::Tests fail against the Kirby 6 pre-release, see the log"
+        run: vendor/bin/phpunit || echo "::warning title=Kirby 6::Tests fail against the Kirby 6 pre-release, see the log"
