@@ -11,7 +11,7 @@
  * both to the review on Google Maps (googleMapsUri; without a safe link they
  * stay unlinked), show the "Google Maps" attribution. The picture comes from
  * the site's own server (route koe/avatar/…), never from Google. Without
- * $logo (or `koe.logo`) the attribution is text; with it, the official,
+ * $logo (or `sayamaapps.koe.logo`) the attribution is text; with it, the official,
  * unaltered logo served from your own site.
  *
  * Rating and count are always shown; empty slots are filled by a "read all

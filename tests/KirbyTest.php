@@ -74,7 +74,7 @@ final class KirbyTest extends TestCase
 		Plugin::$defer = function (Closure $job) use (&$queue): void {
 			$queue[] = $job;
 		};
-		$on = ['koe.active' => true, 'koe.placeId' => 'ChIJExample', 'koe.key' => $key];
+		$on = ['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => $key];
 		/** New Kirby instance with these options; returns [koeReviews(), snippet HTML (entities decoded), Kirby]. */
 		$run = function (array $options, array $snippetData = []) use ($tmp): array {
 			Snippet::$cache = []; // Kirby remembers snippet paths per process
@@ -121,27 +121,27 @@ final class KirbyTest extends TestCase
 		$pictures = ['https://lh3.googleusercontent.com/a/with=s128' => ['status' => 200, 'body' => $jpeg]];
 
 		// 1. Plugin registered; off by default: nothing shown, nothing fetched.
-		[$r, $html, $kirby] = $run(['koe.placeId' => 'ChIJExample', 'koe.key' => $key]);
+		[$r, $html, $kirby] = $run(['sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => $key]);
 		$this->holds($kirby->plugin('sayamaapps/koe') !== null, 'plugin sayamaapps/koe registered');
 		$this->expect(null, $r, 'without koe.active koeReviews() is null');
 		$this->expect('', trim($html), 'without koe.active the snippet prints nothing');
 		$this->expect([], $queue, 'without koe.active nothing is fetched');
-		$this->expect('Read all on Google', $kirby->translation('en')->get('koe.readAll'), 'strings registered as Kirby translations');
-		$this->expect('Alle auf Google lesen', $kirby->translation('de')->get('koe.readAll'), 'German Kirby translation');
+		$this->expect('Read all on Google', $kirby->translation('en')->get('sayamaapps.koe.readAll'), 'strings registered as Kirby translations');
+		$this->expect('Alle auf Google lesen', $kirby->translation('de')->get('sayamaapps.koe.readAll'), 'German Kirby translation');
 		$this->holds(function_exists('koe_option'), 'koe_option() helper');
-		[$r] = $run(['koe.active' => 'yes'] + $on);
-		$this->expect(null, $r, 'koe.active = "yes" must not switch on');
-		$this->expect([], $queue, 'koe.active = "yes": nothing fetched');
+		[$r] = $run(['sayamaapps.koe.active' => 'yes'] + $on);
+		$this->expect(null, $r, 'sayamaapps.koe.active = "yes" must not switch on');
+		$this->expect([], $queue, 'sayamaapps.koe.active = "yes": nothing fetched');
 
 		// 2. Without a place id or without a key: nothing, no request; debug mode says why.
 		$logged();
-		[$r, $html] = $run(['koe.active' => true, 'koe.key' => $key, 'debug' => true]);
+		[$r, $html] = $run(['sayamaapps.koe.active' => true, 'sayamaapps.koe.key' => $key, 'debug' => true]);
 		$this->holds($r === null && trim($html) === '' && $queue === [], 'no koe.placeId: nothing shown, nothing fetched');
-		$this->holds(str_contains($logged(), 'koe.placeId is not set'), 'no koe.placeId: debug log says so');
-		[$r] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJExample', 'debug' => true]);
+		$this->holds(str_contains($logged(), 'sayamaapps.koe.placeId is not set'), 'no koe.placeId: debug log says so');
+		[$r] = $run(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'debug' => true]);
 		$this->holds($r === null && $queue === [], 'no key: nothing shown, nothing fetched');
 		$this->holds(str_contains($logged(), 'no API key'), 'no key: debug log says so');
-		[$r] = $run(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
+		[$r] = $run(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample']);
 		$this->expect('', $logged(), 'without debug nothing is logged for a missing key');
 
 		// 3. On demand: the first view shows nothing and queues one refresh; it runs after the response.
@@ -192,28 +192,28 @@ final class KirbyTest extends TestCase
 		$this->holds($expires !== false && $expires > time() + 23 * 3600 && $expires <= time() + 24 * 3600 + 5, 'Expires matches, so mod_expires adds no year');
 		$this->expect('nosniff', $response->headers()['X-Content-Type-Options'] ?? null, 'nosniff');
 		$this->expect(404, $kirby->call('koe/avatar/ffffffffffffffffffffffffffffffff')->code(), 'unknown picture: 404');
-		[, , $off] = $run(['koe.active' => false] + $on);
+		[, , $off] = $run(['sayamaapps.koe.active' => false] + $on);
 		$this->expect(404, $off->call('koe/avatar/' . basename($with['avatar']))->code(), 'module off: 404');
 
 		// 6. The key from the environment ($_SERVER for Apache SetEnv) or a closure.
 		$_SERVER['GOOGLE_PLACES_API_KEY'] = 'AIza-from-server';
 		$calls = [];
-		$fill(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
+		$fill(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample']);
 		$this->holds(in_array('X-Goog-Api-Key: AIza-from-server', $calls[0]['headers'] ?? [], true), 'key from $_SERVER');
 		unset($_SERVER['GOOGLE_PLACES_API_KEY']);
 		putenv('GOOGLE_PLACES_API_KEY=AIza-from-env');
 		$calls = [];
-		$fill(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
+		$fill(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample']);
 		$this->holds(in_array('X-Goog-Api-Key: AIza-from-env', $calls[0]['headers'] ?? [], true), 'key from getenv()');
 		putenv('GOOGLE_PLACES_API_KEY');
 		$calls = [];
-		$fill(['koe.key' => fn () => 'AIza-from-closure'] + $on);
-		$this->holds(in_array('X-Goog-Api-Key: AIza-from-closure', $calls[0]['headers'] ?? [], true), 'koe.key as closure');
+		$fill(['sayamaapps.koe.key' => fn () => 'AIza-from-closure'] + $on);
+		$this->holds(in_array('X-Goog-Api-Key: AIza-from-closure', $calls[0]['headers'] ?? [], true), 'sayamaapps.koe.key as closure');
 
 		// 7. Holding time: koe.cacheHours, 1 to 24.
 		foreach ([[2, 2], [0, 1], [48, 24], ['6', 6]] as [$hours, $expected]) {
-			$fill(['koe.cacheHours' => $hours] + $on);
-			[, , $kirby] = $run(['koe.cacheHours' => $hours] + $on);
+			$fill(['sayamaapps.koe.cacheHours' => $hours] + $on);
+			[, , $kirby] = $run(['sayamaapps.koe.cacheHours' => $hours] + $on);
 			$left = $kirby->response()->expires() - time();
 			$this->holds($left > ($expected * 3600 - 120) && $left <= $expected * 3600, "koe.cacheHours $hours → $expected h");
 		}
@@ -221,13 +221,13 @@ final class KirbyTest extends TestCase
 		// 8. Settings changed: the cached data no longer fits, the next view fetches anew.
 		$fill($on);
 		$queue = [];
-		[$r] = $run(['koe.minRating' => 4] + $on);
+		[$r] = $run(['sayamaapps.koe.minRating' => 4] + $on);
 		$this->holds($r === null && count($queue) === 1, 'other rules than cached: nothing shown, refresh queued');
 		$drain();
-		[$r] = $run(['koe.minRating' => 4] + $on);
+		[$r] = $run(['sayamaapps.koe.minRating' => 4] + $on);
 		$this->expect(['Four Stars', 'With Link', 'Without Link'], array_column($r['reviews'], 'name'), 'refreshed for the new rules');
 		$queue = [];
-		[$r] = $run(['koe.placeId' => 'ChIJOther'] + $on);
+		[$r] = $run(['sayamaapps.koe.placeId' => 'ChIJOther'] + $on);
 		$this->holds($r === null && count($queue) === 1, 'other place than cached: nothing shown, refresh queued');
 		$queue = [];
 
@@ -256,23 +256,23 @@ final class KirbyTest extends TestCase
 		[, $html] = $run(['locale' => 'de_DE.UTF-8'] + $on);
 		$this->holds(str_contains($html, '<strong>4,8 von 5</strong>') && str_contains($html, '201 Bewertungen auf Google Maps') && str_contains($html, 'Profil ansehen') && str_contains($html, '(öffnet neuen Tab)'), 'German via locale');
 		$this->holds(str_contains($html, '>Bewertungen auf Google</h2>'), 'German default title');
-		$fill(['locale' => 'de_DE', 'koe.language' => 'en'] + $on);
-		[, $html] = $run(['locale' => 'de_DE', 'koe.language' => 'en'] + $on);
-		$this->holds(str_contains($html, '4.8 out of 5'), 'koe.language wins over locale');
+		$fill(['locale' => 'de_DE', 'sayamaapps.koe.language' => 'en'] + $on);
+		[, $html] = $run(['locale' => 'de_DE', 'sayamaapps.koe.language' => 'en'] + $on);
+		$this->holds(str_contains($html, '4.8 out of 5'), 'sayamaapps.koe.language wins over locale');
 
 		// 11. Approval, the tile, title and logo.
-		$approved = ['koe.approved' => ['id-without']] + $on;
+		$approved = ['sayamaapps.koe.approved' => ['id-without']] + $on;
 		$fill($approved);
 		[$r, $html] = $run($approved, ['title' => 'What our customers say', 'logo' => 'assets/GoogleMaps_Logo_Gray.svg']);
 		$this->expect(['Without Link'], array_column($r['reviews'], 'name'), 'approved list');
 		$this->holds(str_contains($html, 'Read all on Google') && str_contains($html, '<p>201 reviews</p>'), 'tile with count below three reviews');
 		$this->holds(str_contains($html, '>What our customers say</h2>'), 'title from snippet data');
 		$this->holds((bool)preg_match('~<img class="koe-logo" src="[^"]*/assets/GoogleMaps_Logo_Gray\.svg"[^>]*alt="Google Maps">~', $html), 'logo with alt text');
-		[, $html] = $run($approved + ['koe.title' => 'Voices', 'koe.logo' => 'assets/logo.svg']);
+		[, $html] = $run($approved + ['sayamaapps.koe.title' => 'Voices', 'sayamaapps.koe.logo' => 'assets/logo.svg']);
 		$this->holds(str_contains($html, '>Voices</h2>') && str_contains($html, '/assets/logo.svg"'), 'title and logo from options');
-		[, $html] = $run($approved + ['koe.logo' => 'assets/logo.svg'], ['logo' => null]);
+		[, $html] = $run($approved + ['sayamaapps.koe.logo' => 'assets/logo.svg'], ['logo' => null]);
 		$this->holds(str_contains($html, '/assets/logo.svg"'), 'snippet data null falls back to the option');
-		$none = ['koe.approved' => []] + $on;
+		$none = ['sayamaapps.koe.approved' => []] + $on;
 		$fill($none);
 		[$r, $html] = $run($none);
 		$this->expect([], $r['reviews'], 'approved []: no single review');
@@ -304,7 +304,7 @@ final class KirbyTest extends TestCase
 		$this->expect($defaultEn, $noticeOf($html), 'default snippet: notice for the default options');
 		$this->expect($defaultEn, $r['notice'], 'koeReviews() hands the notice to own snippets as well');
 		$this->holds(strpos($html, 'koe-notice') > strpos($html, '</ul>'), 'the notice stands below the reviews');
-		$strict = ['koe.minRating' => 4, 'koe.minLength' => 120, 'koe.maxAgeMonths' => 12, 'koe.maxCount' => 2] + $on;
+		$strict = ['sayamaapps.koe.minRating' => 4, 'sayamaapps.koe.minLength' => 120, 'sayamaapps.koe.maxAgeMonths' => 12, 'sayamaapps.koe.maxCount' => 2] + $on;
 		$fill($strict);
 		[, $html] = $run($strict);
 		$this->expect('Selection: 4+ stars, 120+ characters, at most 12 months old, newest first.', $noticeOf($html), 'notice follows the options');

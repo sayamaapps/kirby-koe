@@ -152,7 +152,7 @@ final class Places
 				$messages[] = '  skipped (no text): ' . $label;
 				continue;
 			}
-			// `name` is "places/<place>/reviews/<id>"; the id is what koe.approved lists.
+			// `name` is "places/<place>/reviews/<id>"; the id is what sayamaapps.koe.approved lists.
 			$id = (string)($review['name'] ?? '');
 			$slash = strrpos($id, '/');
 			$id = $slash === false ? $id : substr($id, $slash + 1);

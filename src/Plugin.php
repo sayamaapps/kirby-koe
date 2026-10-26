@@ -114,7 +114,7 @@ final class Plugin
 	{
 		$placeId = $rules['placeId'] ?? null;
 		if ($placeId === null) {
-			Options::debugLog($kirby, 'nothing shown: koe.placeId is not set (koe-fetch shows the id)');
+			Options::debugLog($kirby, 'nothing shown: sayamaapps.koe.placeId is not set (koe-fetch shows the id)');
 			return null;
 		}
 		$cache = $kirby->cache(self::CACHE);
@@ -123,7 +123,7 @@ final class Plugin
 			// The page without reviews must not stay in Kirby's page cache.
 			$kirby->response()->cache(false);
 			if (Options::key($kirby) === null) {
-				Options::debugLog($kirby, 'nothing shown: no API key (koe.key or ' . Options::ENV_KEY . ')');
+				Options::debugLog($kirby, 'nothing shown: no API key (sayamaapps.koe.key or ' . Options::ENV_KEY . ')');
 				return null;
 			}
 			if (Store::claim($cache)) {

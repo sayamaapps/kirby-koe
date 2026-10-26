@@ -32,7 +32,7 @@ class Site
 		return $result;
 	}
 
-	/** Address of the Google profile from `koe.placeId`, or null. */
+	/** Address of the Google profile from `sayamaapps.koe.placeId`, or null. */
 	public static function profileUrl(App $kirby): string|null
 	{
 		return Reviews::profileUrl(Options::placeId($kirby));
