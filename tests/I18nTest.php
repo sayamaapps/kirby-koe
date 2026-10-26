@@ -1,6 +1,6 @@
 <?php
 
-use Koe\I18n;
+use Sayamaapps\Koe\I18n;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
  * English, and numbers and months follow the language.
  *   vendor/bin/phpunit
  */
-#[CoversClass(\Koe\I18n::class)]
+#[CoversClass(\Sayamaapps\Koe\I18n::class)]
 final class I18nTest extends TestCase
 {
 	private function expect(mixed $expected, mixed $actual, string $what): void

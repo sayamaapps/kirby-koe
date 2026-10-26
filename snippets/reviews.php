@@ -29,7 +29,7 @@ $r = site()->koeReviews();
 if ($r === null) {
 	return;
 }
-$t = fn (string $key, array $values = []) => \Koe\I18n::t($key, $values);
+$t = fn (string $key, array $values = []) => \Sayamaapps\Koe\I18n::t($key, $values);
 $profile = $r['profileUrl'];
 $title ??= koe_option('title') ?? $t('title');
 $logo ??= koe_option('logo');
@@ -38,7 +38,7 @@ $tab = '<span class="sr-only"> ' . esc($t('opensNewTab')) . '</span>';
 <section class="koe" id="koe" aria-labelledby="koe-title">
   <h2 id="koe-title"><?= esc($title) ?></h2>
   <p class="koe-rating">
-    <strong><?= esc($t('ratingOutOf', ['rating' => \Koe\I18n::number($r['rating'])])) ?></strong>
+    <strong><?= esc($t('ratingOutOf', ['rating' => \Sayamaapps\Koe\I18n::number($r['rating'])])) ?></strong>
     <span><?= esc($t('countOn', ['count' => $r['count']])) ?> <?php if ($logo) : ?><img class="koe-logo" src="<?= esc(url($logo), 'attr') ?>" width="98" height="18" alt="Google Maps"><?php else : ?>Google Maps<?php endif ?><?php if ($profile) : ?> · <a href="<?= esc($profile, 'attr') ?>" target="_blank" rel="noopener"><?= esc($t('viewProfile')) ?><?= $tab ?></a><?php endif ?></span>
   </p>
   <?php if ($r['reviews'] !== []) : ?>

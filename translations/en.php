@@ -2,7 +2,7 @@
 
 /**
  * English strings of the default snippet — the default and the fallback for
- * missing keys. `{name}` placeholders are filled in by Koe\I18n::t().
+ * missing keys. `{name}` placeholders are filled in by Sayamaapps\Koe\I18n::t().
  * tests/I18nTest.php checks that every language file has the same keys and
  * placeholders as this one.
  */

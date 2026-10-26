@@ -2,7 +2,7 @@
 
 use Kirby\Cms\App;
 use Kirby\Template\Snippet;
-use Koe\Plugin;
+use Sayamaapps\Koe\Plugin;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
  * that a site's own site/snippets/koe/reviews.php wins.
  *   vendor/bin/phpunit
  */
-#[CoversClass(\Koe\Plugin::class)]
+#[CoversClass(\Sayamaapps\Koe\Plugin::class)]
 final class KirbyTest extends TestCase
 {
 	private function expect(mixed $expected, mixed $actual, string $what): void
@@ -64,7 +64,7 @@ final class KirbyTest extends TestCase
 		$calls = [];
 		Plugin::$transport = function (string $url, array $headers, string|null $body) use (&$answer, &$pictures, &$calls): array {
 			$calls[] = ['url' => $url, 'headers' => $headers];
-			if (str_starts_with($url, Koe\Places::ENDPOINT)) {
+			if (str_starts_with($url, Sayamaapps\Koe\Places::ENDPOINT)) {
 				return isset($answer['status']) ? $answer : ['status' => 200, 'body' => json_encode($answer)];
 			}
 			return $pictures[$url] ?? ['status' => 404, 'body' => ''];
@@ -154,7 +154,7 @@ final class KirbyTest extends TestCase
 		[$r] = $run($on);
 		$this->expect(1, count($queue), 'a second view before the refresh ran: no second refresh');
 		$drain();
-		$this->expect(Koe\Places::ENDPOINT . 'places/ChIJExample?languageCode=en', $calls[0]['url'], 'the refresh asks for the details of koe.placeId, in the site language');
+		$this->expect(Sayamaapps\Koe\Places::ENDPOINT . 'places/ChIJExample?languageCode=en', $calls[0]['url'], 'the refresh asks for the details of koe.placeId, in the site language');
 		$this->holds(in_array('X-Goog-Api-Key: ' . $key, $calls[0]['headers'], true), 'the refresh uses koe.key');
 		$this->expect([], $calls[1]['headers'], 'the picture is fetched without the key');
 		$this->holds(is_dir($tmp . '/site/cache') && !is_dir($tmp . '/site/data') && !is_dir($tmp . '/content/reviews'), 'kept in site/cache, nowhere else');
@@ -252,7 +252,7 @@ final class KirbyTest extends TestCase
 		// 10. German: locale, or koe.language; the request asks Google in that language.
 		$calls = [];
 		$fill(['locale' => 'de_DE.UTF-8'] + $on);
-		$this->expect(Koe\Places::ENDPOINT . 'places/ChIJExample?languageCode=de', $calls[0]['url'], 'German site asks in German');
+		$this->expect(Sayamaapps\Koe\Places::ENDPOINT . 'places/ChIJExample?languageCode=de', $calls[0]['url'], 'German site asks in German');
 		[, $html] = $run(['locale' => 'de_DE.UTF-8'] + $on);
 		$this->holds(str_contains($html, '<strong>4,8 von 5</strong>') && str_contains($html, '201 Bewertungen auf Google Maps') && str_contains($html, 'Profil ansehen') && str_contains($html, '(öffnet neuen Tab)'), 'German via locale');
 		$this->holds(str_contains($html, '>Bewertungen auf Google</h2>'), 'German default title');

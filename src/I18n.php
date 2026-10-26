@@ -1,6 +1,6 @@
 <?php
 
-namespace Koe;
+namespace Sayamaapps\Koe;
 
 /**
  * Strings of the default snippet, Kirby-free.

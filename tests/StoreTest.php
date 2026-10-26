@@ -1,7 +1,7 @@
 <?php
 
 use Kirby\Cache\FileCache;
-use Koe\Store;
+use Sayamaapps\Koe\Store;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -30,7 +30,7 @@ final class InterleavedCache extends FileCache
 	}
 }
 
-#[CoversClass(\Koe\Store::class)]
+#[CoversClass(\Sayamaapps\Koe\Store::class)]
 final class StoreTest extends TestCase
 {
 	private function expect(mixed $expected, mixed $actual, string $what): void
@@ -87,7 +87,7 @@ final class StoreTest extends TestCase
 		$transport = function (array|Throwable $answer, array $pictures = []) use (&$calls): Closure {
 			return function (string $url, array $headers, string|null $body) use (&$calls, $answer, $pictures): array {
 				$calls[] = ['url' => $url, 'headers' => $headers];
-				if (str_starts_with($url, Koe\Places::ENDPOINT)) {
+				if (str_starts_with($url, Sayamaapps\Koe\Places::ENDPOINT)) {
 					if ($answer instanceof Throwable) {
 						throw $answer;
 					}
@@ -102,7 +102,7 @@ final class StoreTest extends TestCase
 		};
 		$ok = fn (array $d) => ['status' => 200, 'body' => json_encode($d)];
 		$settings = ['placeId' => 'ChIJTestPlace_Id0', 'language' => 'de', 'minutes' => 60];
-		$rules = Koe\Reviews::defaultRules();
+		$rules = Sayamaapps\Koe\Reviews::defaultRules();
 		$fingerprint = Store::fingerprint($settings, $rules);
 		$annaPhoto = 'https://lh3.googleusercontent.com/a/example=s128-c0x00000000-cc-rp-mo';
 		// ---- Fingerprint: the settings the data was fetched for ------------------
@@ -125,7 +125,7 @@ final class StoreTest extends TestCase
 		$calls = [];
 		$problem = Store::refresh($cache, $transport($ok($details), [$annaPhoto => ['status' => 200, 'body' => $jpeg]]), $key, $settings, $rules, $today);
 		$this->expect(null, $problem, 'refresh succeeds');
-		$this->expect(Koe\Places::ENDPOINT . 'places/ChIJTestPlace_Id0?languageCode=de', $calls[0]['url'], 'one details call for the configured place, in the site language, no text search');
+		$this->expect(Sayamaapps\Koe\Places::ENDPOINT . 'places/ChIJTestPlace_Id0?languageCode=de', $calls[0]['url'], 'one details call for the configured place, in the site language, no text search');
 		$this->expect([$annaPhoto], array_slice(array_column($calls, 'url'), 1), 'only the picture of the review that is kept is fetched');
 		$this->expect([], $calls[1]['headers'], 'the picture request carries no key and no other header');
 		$data = Store::read($cache, $fingerprint);

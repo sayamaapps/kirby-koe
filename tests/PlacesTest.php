@@ -1,8 +1,8 @@
 <?php
 
-use Koe\Fetch;
-use Koe\Places;
-use Koe\PlacesException;
+use Sayamaapps\Koe\Fetch;
+use Sayamaapps\Koe\Places;
+use Sayamaapps\Koe\PlacesException;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -14,9 +14,9 @@ use PHPUnit\Framework\TestCase;
  * shows; it writes nothing. The key must never appear in any output.
  *   vendor/bin/phpunit
  */
-#[CoversClass(\Koe\Fetch::class)]
-#[CoversClass(\Koe\Places::class)]
-#[CoversClass(\Koe\PlacesException::class)]
+#[CoversClass(\Sayamaapps\Koe\Fetch::class)]
+#[CoversClass(\Sayamaapps\Koe\Places::class)]
+#[CoversClass(\Sayamaapps\Koe\PlacesException::class)]
 final class PlacesTest extends TestCase
 {
 	private function expect(mixed $expected, mixed $actual, string $what): void

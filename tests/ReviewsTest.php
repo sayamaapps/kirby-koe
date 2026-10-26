@@ -1,7 +1,7 @@
 <?php
 
-use Koe\I18n;
-use Koe\Reviews;
+use Sayamaapps\Koe\I18n;
+use Sayamaapps\Koe\Reviews;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  * without Kirby.
  *   vendor/bin/phpunit
  */
-#[CoversClass(\Koe\Reviews::class)]
+#[CoversClass(\Sayamaapps\Koe\Reviews::class)]
 final class ReviewsTest extends TestCase
 {
 	private function expect(mixed $expected, mixed $actual, string $what): void

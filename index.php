@@ -1,19 +1,15 @@
 <?php
 
 use Kirby\Cms\App;
+use Kirby\Filesystem\F;
 
-require_once __DIR__ . '/src/I18n.php';
-require_once __DIR__ . '/src/Options.php';
-require_once __DIR__ . '/src/Reviews.php';
-require_once __DIR__ . '/src/PlacesException.php';
-require_once __DIR__ . '/src/Places.php';
-require_once __DIR__ . '/src/Store.php';
-require_once __DIR__ . '/src/Plugin.php';
+F::loadClasses(require __DIR__ . '/autoload.php', __DIR__);
+require_once __DIR__ . '/legacy.php';
 
-use Koe\I18n;
-use Koe\Options;
-use Koe\Plugin;
-use Koe\Reviews;
+use Sayamaapps\Koe\I18n;
+use Sayamaapps\Koe\Options;
+use Sayamaapps\Koe\Plugin;
+use Sayamaapps\Koe\Reviews;
 
 /**
  * Koe (声, "voice") — Google reviews served from your own server. Off by
