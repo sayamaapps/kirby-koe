@@ -27,7 +27,7 @@
  */
 $r = site()->koeReviews();
 if ($r === null) {
-    return;
+	return;
 }
 $t = fn (string $key, array $values = []) => \Koe\I18n::t($key, $values);
 $profile = $r['profileUrl'];

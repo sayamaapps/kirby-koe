@@ -38,91 +38,91 @@ use Koe\Reviews;
  * fail). It only says so in the error log until the copy is deleted.
  */
 if (class_exists('Bewertungen\\Stimmen', false)) {
-    error_log('Koe: site/plugins/bewertungen/ (the pre-1.0 copy) still exists next to the package — delete it.');
+	error_log('Koe: site/plugins/bewertungen/ (the pre-1.0 copy) still exists next to the package — delete it.');
 }
 
 /** Reads `koe.<key>`. Also meant for site snippets with their own markup. */
 function koe_option(string $key, mixed $default = null): mixed
 {
-    return Options::get(App::instance(), $key, $default);
+	return Options::get(App::instance(), $key, $default);
 }
 
 $koeTranslations = [];
 foreach (I18n::LANGUAGES as $koeLanguage) {
-    foreach (I18n::table($koeLanguage) as $koeKey => $koeText) {
-        $koeTranslations[$koeLanguage]['koe.' . $koeKey] = $koeText;
-    }
+	foreach (I18n::table($koeLanguage) as $koeKey => $koeText) {
+		$koeTranslations[$koeLanguage]['koe.' . $koeKey] = $koeText;
+	}
 }
 unset($koeLanguage, $koeKey, $koeText);
 
 App::plugin('sayamaapps/koe', [
-    // Kirby's plugin cache `sayamaapps.koe` (site/cache/ by default): the only
-    // place anything from Google is kept. A site may set
-    // 'sayamaapps.koe.cache' => ['type' => 'apcu'] or the like.
-    'options' => [
-        'cache' => true,
-    ],
+	// Kirby's plugin cache `sayamaapps.koe` (site/cache/ by default): the only
+	// place anything from Google is kept. A site may set
+	// 'sayamaapps.koe.cache' => ['type' => 'apcu'] or the like.
+	'options' => [
+		'cache' => true,
+	],
 
-    // The snippet strings, also usable as t('koe.<key>').
-    'translations' => $koeTranslations,
+	// The snippet strings, also usable as t('koe.<key>').
+	'translations' => $koeTranslations,
 
-    /**
-     * A plain default. A site with its own markup creates
-     * site/snippets/koe/reviews.php — Kirby looks there first — or any
-     * snippet of its own that calls $site->koeReviews().
-     */
-    'snippets' => [
-        'koe/reviews' => __DIR__ . '/snippets/reviews.php',
-    ],
+	/**
+	 * A plain default. A site with its own markup creates
+	 * site/snippets/koe/reviews.php — Kirby looks there first — or any
+	 * snippet of its own that calls $site->koeReviews().
+	 */
+	'snippets' => [
+		'koe/reviews' => __DIR__ . '/snippets/reviews.php',
+	],
 
-    // Profile pictures of the reviewers, from the cache: the browser never
-    // asks Google for them.
-    'routes' => [
-        [
-            'pattern' => 'koe/avatar/(:alphanum)',
-            'action'  => fn (string $id) => Plugin::avatar(App::instance(), $id),
-        ],
-    ],
+	// Profile pictures of the reviewers, from the cache: the browser never
+	// asks Google for them.
+	'routes' => [
+		[
+			'pattern' => 'koe/avatar/(:alphanum)',
+			'action'  => fn (string $id) => Plugin::avatar(App::instance(), $id),
+		],
+	],
 
-    'siteMethods' => [
-        /**
-         * Overall rating, count and the selected reviews (possibly none), or
-         * null (= show nothing: switched off, no `koe.placeId`, no key,
-         * nothing cached yet — then the reviews are fetched after this
-         * response — or a place without rating; the debug log says why).
-         *
-         *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…',
-         *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url', 'avatar'], …],
-         *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…']
-         *
-         * `limit` is the configured maximum: a snippet fills the remaining
-         * slots with a "read all on Google" tile when count(reviews) < limit.
-         * `notice` tells visitors how the reviews were selected and sorted,
-         * worded from the options in force (plain text, in the snippet's
-         * language); a snippet that lists single reviews prints it.
-         */
-        'koeReviews' => function (): ?array {
-            $kirby = $this->kirby();
-            if (Options::get($kirby, 'active', false) !== true) {
-                return null;
-            }
-            I18n::setLanguage(Options::language($kirby));
-            $rules = Options::rules($kirby);
-            $result = Plugin::reviews($kirby, $rules);
-            if ($result === null) {
-                return null;
-            }
-            $result['notice'] = Reviews::notice($rules);
-            $result['profileUrl'] = $this->koeProfileUrl();
-            return $result;
-        },
+	'siteMethods' => [
+		/**
+		 * Overall rating, count and the selected reviews (possibly none), or
+		 * null (= show nothing: switched off, no `koe.placeId`, no key,
+		 * nothing cached yet — then the reviews are fetched after this
+		 * response — or a place without rating; the debug log says why).
+		 *
+		 *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…',
+		 *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url', 'avatar'], …],
+		 *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…']
+		 *
+		 * `limit` is the configured maximum: a snippet fills the remaining
+		 * slots with a "read all on Google" tile when count(reviews) < limit.
+		 * `notice` tells visitors how the reviews were selected and sorted,
+		 * worded from the options in force (plain text, in the snippet's
+		 * language); a snippet that lists single reviews prints it.
+		 */
+		'koeReviews' => function (): array|null {
+			$kirby = $this->kirby();
+			if (Options::get($kirby, 'active', false) !== true) {
+				return null;
+			}
+			I18n::setLanguage(Options::language($kirby));
+			$rules = Options::rules($kirby);
+			$result = Plugin::reviews($kirby, $rules);
+			if ($result === null) {
+				return null;
+			}
+			$result['notice'] = Reviews::notice($rules);
+			$result['profileUrl'] = $this->koeProfileUrl();
+			return $result;
+		},
 
-        /**
-         * Address of the Google profile from `koe.placeId`, or null (then no
-         * profile link and no tile).
-         */
-        'koeProfileUrl' => function (): ?string {
-            return Reviews::profileUrl(Options::placeId($this->kirby()));
-        },
-    ],
+		/**
+		 * Address of the Google profile from `koe.placeId`, or null (then no
+		 * profile link and no tile).
+		 */
+		'koeProfileUrl' => function (): string|null {
+			return Reviews::profileUrl(Options::placeId($this->kirby()));
+		},
+	],
 ]);
