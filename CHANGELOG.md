@@ -12,6 +12,17 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [Unreleased]
+
+### Fixed
+
+- **Parallel visitors on an empty cache could start several refreshes.** The
+  check for a running refresh and its mark were two steps, so requests
+  arriving at the same moment could both start one, each costing Places
+  requests. The check and the mark now happen under a lock file beside the
+  cache directory, held until the refresh has ended. Cache drivers without a
+  file (not the default) keep the former check.
+
 ## [2.2.0] — 2026-10-21
 
 ### Added

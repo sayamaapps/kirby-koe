@@ -98,7 +98,8 @@ $fill = function (array $options) use ($run, $drain, $tmp, &$queue): void {
     $run($options);
     $drain();
 };
-$cacheFiles = fn () => is_dir($tmp . '/site/cache') ? count(iterator_to_array(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp . '/site/cache', FilesystemIterator::SKIP_DOTS)))) : 0;
+// The lock files (`*.lock`, beside each cache directory) hold nothing and are not counted.
+$cacheFiles = fn () => is_dir($tmp . '/site/cache') ? count(array_filter(iterator_to_array(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp . '/site/cache', FilesystemIterator::SKIP_DOTS))), fn (SplFileInfo $file) => !str_ends_with($file->getFilename(), '.lock'))) : 0;
 
 try {
     foreach (['public', 'content/home', 'site/plugins', 'site/snippets', 'site/templates', 'storage'] as $dir) {

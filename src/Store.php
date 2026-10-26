@@ -5,6 +5,7 @@ namespace Koe;
 use Closure;
 use DateTimeImmutable;
 use Kirby\Cache\Cache;
+use Kirby\Cache\FileCache;
 
 /**
  * The short-lived server-side cache of the reviews — the only place Koe keeps
@@ -34,6 +35,8 @@ final class Store
     public const MAX_AVATAR_BYTES = 262144;
     /** Changes when the cached structure changes, so an old entry is fetched anew. */
     private const VERSION = 1;
+    /** Lock of the refresh this process runs; held from claim() until refresh() has ended. */
+    private static $lock = null;
 
     /**
      * The settings and rules the cached data must have been fetched for. The
@@ -73,15 +76,23 @@ final class Store
 
     /**
      * Whether this request may start a refresh (it found no data that fits).
-     * True at most once per RETRY_MINUTES; it marks the cache so the others
-     * wait.
+     * True at most once per RETRY_MINUTES, and never while another request
+     * checks or refreshes: the check and the mark happen under a lock that
+     * the claimer keeps until refresh() has ended. Without a file cache there
+     * is no file to lock, and the check is not atomic.
      */
     public static function claim(Cache $cache): bool
     {
+        $lock = self::openLock($cache);
+        if ($lock === false) {
+            return false;
+        }
         if ($cache->exists(self::RETRY)) {
+            self::closeLock($lock);
             return false;
         }
         $cache->set(self::RETRY, true, self::RETRY_MINUTES);
+        self::$lock = $lock;
         return true;
     }
 
@@ -95,6 +106,16 @@ final class Store
      * @return ?string null when done, otherwise what went wrong (the key scrubbed)
      */
     public static function refresh(Cache $cache, Closure $transport, string $key, array $settings, array $rules, DateTimeImmutable $today): ?string
+    {
+        try {
+            return self::replace($cache, $transport, $key, $settings, $rules, $today);
+        } finally {
+            self::closeLock(self::$lock);
+            self::$lock = null;
+        }
+    }
+
+    private static function replace(Cache $cache, Closure $transport, string $key, array $settings, array $rules, DateTimeImmutable $today): ?string
     {
         $placeId = $settings['placeId'];
         try {
@@ -155,6 +176,40 @@ final class Store
             return null;
         }
         return ['type' => self::type($body), 'body' => $body, 'expires' => (int) $cache->expires('avatar-' . $id)];
+    }
+
+    /**
+     * The lock file of a file cache, taken without waiting: false when another
+     * request holds it, null when there is no file to lock. The file lies
+     * beside the cache directory, not in it, because flush() removes that
+     * directory. The operating system drops the lock when the process ends,
+     * so a crashed refresh cannot keep it.
+     *
+     * @return resource|false|null
+     */
+    private static function openLock(Cache $cache)
+    {
+        if (!$cache instanceof FileCache) {
+            return null;
+        }
+        $handle = @fopen($cache->root() . '.lock', 'c');
+        if ($handle === false) {
+            return null;
+        }
+        if (!flock($handle, LOCK_EX | LOCK_NB)) {
+            fclose($handle);
+            return false;
+        }
+        return $handle;
+    }
+
+    /** @param resource|false|null $handle */
+    private static function closeLock($handle): void
+    {
+        if (is_resource($handle)) {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
     }
 
     private static function fail(Cache $cache, string $problem): string
