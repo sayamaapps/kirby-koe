@@ -2,10 +2,10 @@
 
 use Kirby\Cms\App;
 use Kirby\Template\Snippet;
-use Sayamaapps\Koe\Plugin;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Koe\Plugin;
 
 /**
  * The plugin with real Kirby, in a throwaway directory: the switch (off by

@@ -1,10 +1,10 @@
 <?php
 
 use Kirby\Cache\FileCache;
-use Sayamaapps\Koe\Store;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Koe\Store;
 
 /**
  * The cache: one refresh against recorded Places API answers, what is kept

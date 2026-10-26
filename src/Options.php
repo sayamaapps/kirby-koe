@@ -15,7 +15,6 @@ use Kirby\Cms\Helpers;
  * Both spellings work, flat (`'sayamaapps.koe.active' => true`) and nested
  * (`'koe' => ['active' => true]`), because Kirby's option() finds both.
  *
- * @package   Kirby Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -28,11 +27,12 @@ class Options
 
 	/** Where the API key is looked for when `sayamaapps.koe.key` is not set. */
 	public const ENV_KEY = 'GOOGLE_PLACES_API_KEY';
-	/** Prefix of the option keys: `sayamaapps.koe.<key>`. */
-	public const PREFIX = 'sayamaapps.koe.';
 
 	/** The spelling before 2.3: `koe.<key>`, read as a fallback until the next major version. */
 	public const LEGACY_PREFIX = 'koe.';
+
+	/** Prefix of the option keys: `sayamaapps.koe.<key>`. */
+	public const PREFIX = 'sayamaapps.koe.';
 
 	/**
 	 * Logs why nothing is shown, but only in Kirby's debug mode: on a live

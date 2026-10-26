@@ -6,7 +6,6 @@ namespace Sayamaapps\Koe;
 /**
  * Koe class.
  *
- * @package   Kirby Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder

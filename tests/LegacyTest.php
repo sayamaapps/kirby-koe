@@ -14,17 +14,6 @@ use PHPUnit\Framework\TestCase;
 #[CoversNothing]
 final class LegacyTest extends TestCase
 {
-	public function testOldClassNamesAreAliasesOfTheNewOnes(): void
-	{
-		require_once dirname(__DIR__) . '/legacy.php';
-
-		foreach (['Fetch', 'I18n', 'Options', 'Places', 'PlacesException', 'Plugin', 'Reviews', 'Store'] as $name) {
-			$class = new ReflectionClass('Koe\\' . $name);
-			Assert::assertSame('Sayamaapps\\Koe\\' . $name, $class->getName(), "Koe\\$name is an alias");
-		}
-		Assert::assertSame('Read all on Google', Koe\I18n::t('readAll'), 'the alias works');
-	}
-
 	public function testKoeOptionReadsAndIsDeprecated(): void
 	{
 		require_once dirname(__DIR__) . '/legacy.php';
@@ -53,5 +42,16 @@ final class LegacyTest extends TestCase
 			App::destroy();
 			Dir::remove($tmp);
 		}
+	}
+
+	public function testOldClassNamesAreAliasesOfTheNewOnes(): void
+	{
+		require_once dirname(__DIR__) . '/legacy.php';
+
+		foreach (['Fetch', 'I18n', 'Options', 'Places', 'PlacesException', 'Plugin', 'Reviews', 'Store'] as $name) {
+			$class = new ReflectionClass('Koe\\' . $name);
+			Assert::assertSame('Sayamaapps\\Koe\\' . $name, $class->getName(), "Koe\\$name is an alias");
+		}
+		Assert::assertSame('Read all on Google', Koe\I18n::t('readAll'), 'the alias works');
 	}
 }

@@ -1,11 +1,11 @@
 <?php
 
-use Sayamaapps\Koe\Fetch;
-use Sayamaapps\Koe\Places;
-use Sayamaapps\Koe\PlacesException;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Koe\Fetch;
+use Sayamaapps\Koe\Places;
+use Sayamaapps\Koe\PlacesException;
 
 /**
  * The Places client and the koe-fetch lookup against recorded Places API

@@ -1,10 +1,10 @@
 <?php
 
-use Sayamaapps\Koe\I18n;
-use Sayamaapps\Koe\Reviews;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Koe\I18n;
+use Sayamaapps\Koe\Reviews;
 
 /**
  * Selection rules, approval, links, the profile URL and the notice —

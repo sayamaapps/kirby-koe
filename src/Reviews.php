@@ -16,7 +16,6 @@ use DateTimeImmutable;
  * `text`, optionally `url` (googleMapsUri) and, once the refresh has fetched
  * the profile picture, `avatar` (its key in the cache).
  *
- * @package   Kirby Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder

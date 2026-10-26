@@ -1,7 +1,7 @@
 <?php
 
-use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -11,6 +11,16 @@ use PHPUnit\Framework\TestCase;
 #[CoversNothing]
 final class AutoloadTest extends TestCase
 {
+	public function testClassMapKeysMatchTheClassNames(): void
+	{
+		$map = require dirname(__DIR__) . '/autoload.php';
+
+		foreach ($map as $class => $file) {
+			$expected = strtolower('Sayamaapps\\Koe\\' . basename($file, '.php'));
+			Assert::assertSame($expected, $class, "$file is listed under the wrong key");
+		}
+	}
+
 	public function testClassMapListsEverySourceFile(): void
 	{
 		$base = dirname(__DIR__);
@@ -25,15 +35,5 @@ final class AutoloadTest extends TestCase
 		$listed = array_values($map);
 		sort($listed);
 		Assert::assertSame($sources, $listed, 'every file in src/ is in the class map, and nothing else');
-	}
-
-	public function testClassMapKeysMatchTheClassNames(): void
-	{
-		$map = require dirname(__DIR__) . '/autoload.php';
-
-		foreach ($map as $class => $file) {
-			$expected = strtolower('Sayamaapps\\Koe\\' . basename($file, '.php'));
-			Assert::assertSame($expected, $class, "$file is listed under the wrong key");
-		}
 	}
 }

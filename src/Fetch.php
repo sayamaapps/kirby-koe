@@ -18,7 +18,6 @@ use Closure;
  *
  * The key is never printed. Google's error messages are scrubbed of it too.
  *
- * @package   Kirby Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder

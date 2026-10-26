@@ -1,9 +1,9 @@
 <?php
 
-use Sayamaapps\Koe\I18n;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Sayamaapps\Koe\I18n;
 
 /**
  * Translations: every language has the same keys and placeholders as
