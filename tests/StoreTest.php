@@ -18,6 +18,23 @@ require_once $base . '/src/Store.php';
 use Kirby\Cache\FileCache;
 use Koe\Store;
 
+/** A file cache that runs $afterExists once, right after its first check: the moment another request could slip in. */
+final class InterleavedCache extends FileCache
+{
+    public ?Closure $afterExists = null;
+
+    public function exists(string $key): bool
+    {
+        $found = parent::exists($key);
+        if ($this->afterExists !== null) {
+            $hook = $this->afterExists;
+            $this->afterExists = null;
+            $hook();
+        }
+        return $found;
+    }
+}
+
 $checks = 0;
 function expect($expected, $actual, string $what): void
 {
@@ -171,6 +188,20 @@ try {
     expect(null, Store::read($cache, $fingerprint), 'expired: nothing shown');
     expect(false, is_file($file), 'expired: the file is deleted on that read');
     expect(true, Store::claim($cache), 'expired: the next visitor starts a refresh');
+
+    // ---- Two requests at the same moment: only one may start the refresh ----------
+    $raceRoot = $tmp . '-race';
+    $racy = new InterleavedCache(['root' => $raceRoot, 'prefix' => 'koe', 'extension' => 'cache']);
+    $rival = null;
+    $racy->afterExists = function () use (&$rival, $raceRoot): void {
+        // The other request checks and marks between our check and our mark.
+        $rival = Store::claim(new FileCache(['root' => $raceRoot, 'prefix' => 'koe', 'extension' => 'cache']));
+    };
+    $winner = Store::claim($racy);
+    expect(1, (int) $winner + (int) $rival, 'two requests at the same moment: exactly one may start the refresh');
+    // The winner's refresh ends the lock; it fails here on purpose (nothing to keep).
+    Store::refresh($racy, $transport(new RuntimeException('Could not resolve host (' . $key . ')')), $key, $settings, $rules, $today);
+    removeTree($raceRoot);
 
     echo "Koe store: all $checks checks passed\n";
 } catch (Throwable $e) {
