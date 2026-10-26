@@ -13,5 +13,6 @@ return [
 	'sayamaapps\\koe\\placesexception' => 'src/PlacesException.php',
 	'sayamaapps\\koe\\plugin'         => 'src/Plugin.php',
 	'sayamaapps\\koe\\reviews'        => 'src/Reviews.php',
+	'sayamaapps\\koe\\site'           => 'src/Site.php',
 	'sayamaapps\\koe\\store'          => 'src/Store.php',
 ];
