@@ -31,22 +31,31 @@
     },
     "require-dev": {
         "getkirby/cms": "^5.0",
-        "phpunit/phpunit": "11.5.55"
+        "icanhazstring/composer-unused": "0.9.7",
+        "maglnet/composer-require-checker": "4.17.0",
+        "phpmd/phpmd": "2.15.0",
+        "phpunit/phpunit": "11.5.55",
+        "vimeo/psalm": "6.20.1"
     },
     "bin": [
         "bin/koe-fetch"
     ],
     "scripts": {
+        "analyze:phpmd": "vendor/bin/phpmd src,index.php,legacy.php,autoload.php,config github phpmd.xml.dist",
+        "analyze:psalm": "vendor/bin/psalm",
+        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=composer-require-checker.json composer.json",
+        "analyze:unused": "vendor/bin/composer-unused",
         "test": "vendor/bin/phpunit"
     },
     "config": {
-        "optimize-autoloader": true,
         "allow-plugins": {
             "getkirby/composer-installer": true
         },
+        "optimize-autoloader": true,
         "platform": {
-            "php": "8.2.0"
-        }
+            "php": "8.2.27"
+        },
+        "sort-packages": true
     },
     "extra": {
         "installer-name": "koe",
@@ -54,5 +63,8 @@
         "kirby": {
             "compatible": "^5.0"
         }
+    },
+    "suggest": {
+        "ext-curl": "Faster Places API requests; without it the streams wrapper is used."
     }
 }
