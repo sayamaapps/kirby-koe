@@ -28,6 +28,14 @@ All notable changes to this project are documented here. Versions follow
   deprecation for `koe.<name>` into an error page on every page that calls
   `koeReviews()`. Switch the options to `sayamaapps.koe.<name>`, or turn
   debug mode off on sites that still use the old keys.
+- **The `koe-fetch` usage and messages name `sayamaapps.koe.*`.** The exit
+  codes are unchanged.
+
+### Removed
+
+- **`Plugin::$transport` and `Plugin::$defer`.** Public static test switches,
+  not part of the documented API. The same closures are optional arguments of
+  `Plugin::refresh()` and `Plugin::reviews()`.
 
 ### Fixed
 
