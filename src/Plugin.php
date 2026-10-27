@@ -28,12 +28,6 @@ class Plugin
 	/** Kirby's cache for the plugin `sayamaapps/koe` (option `sayamaapps.koe.cache`). */
 	public const CACHE = 'sayamaapps.koe';
 
-	/** Runs a job after the response; null = the real way. For tests. */
-	public static Closure|null $defer = null;
-
-	/** The HTTP transport (see Places); null = the real one. For tests. */
-	public static Closure|null $transport = null;
-
 	/**
 	 * The route `koe/avatar/<key>`: a cached profile picture, or 404. The
 	 * browser may keep it only as long as the cache. `Expires` is sent next
@@ -56,11 +50,14 @@ class Plugin
 		]);
 	}
 
-	/** Runs $job after the response has been sent, where the server allows it. */
-	private static function defer(Closure $job): void
+	/**
+	 * Runs $job after the response has been sent, where the server allows it.
+	 * $runner, when given, runs the job instead (the caller decides when).
+	 */
+	private static function defer(Closure $job, Closure|null $runner = null): void
 	{
-		if (self::$defer !== null) {
-			(self::$defer)($job);
+		if ($runner !== null) {
+			$runner($job);
 			return;
 		}
 		register_shutdown_function(function () use ($job): void {
@@ -82,9 +79,10 @@ class Plugin
 	 * Fetches the reviews into the cache. Failures go to the error log (also
 	 * outside debug mode: they need someone to act), the key scrubbed.
 	 *
+	 * @param ?Closure $transport the HTTP client (see Places); null = the real one
 	 * @return ?string null when done, otherwise what went wrong
 	 */
-	public static function refresh(App $kirby, array $rules): string|null
+	public static function refresh(App $kirby, array $rules, Closure|null $transport = null): string|null
 	{
 		$key = Options::key($kirby);
 		$placeId = $rules['placeId'] ?? null;
@@ -94,7 +92,7 @@ class Plugin
 		try {
 			$problem = Store::refresh(
 				$kirby->cache(self::CACHE),
-				self::$transport ?? Places::defaultTransport(10),
+				$transport ?? Places::defaultTransport(10),
 				$key,
 				self::settings($kirby, $placeId),
 				$rules,
@@ -113,9 +111,11 @@ class Plugin
 	 * Rating, count and the selected reviews, or null (= show nothing: no
 	 * place id, no key, nothing cached yet, or a place without rating).
 	 *
+	 * @param ?Closure $transport passed on to refresh() (null = the real one)
+	 * @param ?Closure $defer runs the refresh job instead of deferring it after the response (null = the server way)
 	 * @return array{rating: float, count: int, placeId: string, reviews: array<int, array<string, mixed>>, limit: int}|null
 	 */
-	public static function reviews(App $kirby, array $rules): array|null
+	public static function reviews(App $kirby, array $rules, Closure|null $transport = null, Closure|null $defer = null): array|null
 	{
 		$placeId = $rules['placeId'] ?? null;
 		if ($placeId === null) {
@@ -132,7 +132,7 @@ class Plugin
 				return null;
 			}
 			if (Store::claim($cache)) {
-				self::defer(fn () => self::refresh($kirby, $rules));
+				self::defer(fn () => self::refresh($kirby, $rules, $transport), $defer);
 			}
 			return null;
 		}
