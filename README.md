@@ -106,23 +106,24 @@ Changing `placeId`, `language`, `cacheHours` or a selection rule makes the next 
 |---|---|---|
 | `Koe\*` classes | `Sayamaapps\Koe\*` | Class aliases, loaded with the plugin. |
 | `koe_option($key, $default)` | `Sayamaapps\Koe\Options::get(kirby(), $key, $default)` | Deprecated. Keeps working and raises no notice. |
+| `Koe\PlacesException` | unchanged | Not an alias: the exception is declared under this name. |
 
 ## Planned for the next major version
 
-Option keys `sayamaapps.koe.<name>` will replace `koe.<name>`, which is then no longer read, and translation keys `sayamaapps.koe.<key>` will replace `koe.<key>`. The names above will be removed. Sites must rename their keys with that update.
+Option keys `sayamaapps.koe.<name>` will replace `koe.<name>`, which is then no longer read. Translation keys `sayamaapps.koe.<key>` already work and replace `koe.<key>`, which is then removed. The names above will be removed. Sites must rename their option keys with that update.
 
-Tests: `composer test` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
+Tests: `composer test`; all checks: `composer ci` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
 
 ## Implementation notes
 
-The Places client (`Sayamaapps\Koe\Places`, with its own transport: curl, or streams without curl) and the translation table (`Sayamaapps\Koe\I18n`) do not use Kirby's `Remote` and `I18n`. The Places client throws `Sayamaapps\Koe\PlacesException`, a plain `RuntimeException`, and not one of Kirby's exceptions, because the core also runs without Kirby in the `koe-fetch` CLI. The snippet texts must match what the CLI prints. Everything else follows the Kirby standard: options, translations, site methods, routes and the cache.
+The Places client (`Sayamaapps\Koe\Places`, with its own transport: curl, or streams without curl) and the translation table (`Sayamaapps\Koe\I18n`) do not use Kirby's `Remote` and `I18n`. The Places client throws `Koe\PlacesException`, the name it had before, a plain `RuntimeException`, and not one of Kirby's exceptions, because the core also runs without Kirby in the `koe-fetch` CLI. The snippet texts must match what the CLI prints. Everything else follows the Kirby standard: options, translations, site methods, routes and the cache.
 
 ## Privacy
 
 - **No request from the visitor's browser.** No script, embed, font or image comes from Google. Profile pictures and the optional "Google Maps" logo are served from your site; Google opens only when a visitor clicks a link.
 - **Cache only.** Reviews and pictures stay in Kirby's cache for `koe.cacheHours` at most, then they are fetched anew. Nothing else from Google is kept. The plugin sets no cookies and uses no browser storage.
 
-See [PRIVACY.md](PRIVACY.md) (English) and [DATENSCHUTZ.md](DATENSCHUTZ.md) (German text for privacy policies). They are not legal advice.
+See [PRIVACY.md](PRIVACY.md) (English) and [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md) (German text for privacy policies). They are not legal advice.
 
 ## License
 
