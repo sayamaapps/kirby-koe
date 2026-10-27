@@ -34,30 +34,42 @@ $profile = $r['profileUrl'];
 $title ??= \Sayamaapps\Koe\Options::get(kirby(), 'title') ?? $t('title');
 $logo ??= \Sayamaapps\Koe\Options::get(kirby(), 'logo');
 $tab = '<span class="sr-only"> ' . esc($t('opensNewTab')) . '</span>';
+$attribution = $logo
+	? '<img class="koe-logo" src="' . esc(url($logo), 'attr') . '" width="98" height="18" alt="Google Maps">'
+	: 'Google Maps';
+$viewProfile = $profile
+	? ' · <a href="' . esc($profile, 'attr') . '" target="_blank" rel="noopener">' . esc($t('viewProfile')) . $tab . '</a>'
+	: '';
 ?>
 <section class="koe" id="koe" aria-labelledby="koe-title">
-  <h2 id="koe-title"><?= esc($title) ?></h2>
-  <p class="koe-rating">
-    <strong><?= esc($t('ratingOutOf', ['rating' => \Sayamaapps\Koe\I18n::number($r['rating'])])) ?></strong>
-    <span><?= esc($t('countOn', ['count' => $r['count']])) ?> <?php if ($logo) : ?><img class="koe-logo" src="<?= esc(url($logo), 'attr') ?>" width="98" height="18" alt="Google Maps"><?php else : ?>Google Maps<?php endif ?><?php if ($profile) : ?> · <a href="<?= esc($profile, 'attr') ?>" target="_blank" rel="noopener"><?= esc($t('viewProfile')) ?><?= $tab ?></a><?php endif ?></span>
-  </p>
-  <?php if ($r['reviews'] !== []) : ?>
-  <ul class="koe-list">
-    <?php foreach ($r['reviews'] as $review) : ?>
-    <?php $avatar = $review['avatar'] ? '<img class="koe-avatar" src="' . esc($review['avatar'], 'attr') . '" width="32" height="32" alt="" loading="lazy">' : '' ?>
-    <li class="koe-review">
-      <p class="koe-stars" role="img" aria-label="<?= esc($t('starsOutOf', ['stars' => $review['rating']]), 'attr') ?>"><span aria-hidden="true"><?= str_repeat('★', $review['rating']) ?></span></p>
-      <blockquote><?= nl2br(esc($review['text'])) ?></blockquote>
-      <p class="koe-author"><?php if ($review['url']) : ?><a href="<?= esc($review['url'], 'attr') ?>" target="_blank" rel="noopener"><?= $avatar ?><?= esc($review['name']) ?><?= $tab ?></a><?php else : ?><?= $avatar ?><?= esc($review['name']) ?><?php endif ?> · <time datetime="<?= esc($review['date'], 'attr') ?>"><?= esc($review['month']) ?></time></p>
-    </li>
-    <?php endforeach ?>
-    <?php if ($profile && count($r['reviews']) < $r['limit']) : ?>
-    <li class="koe-review koe-more">
-      <p><?= esc($t('reviewsCount', ['count' => $r['count']])) ?></p>
-      <a href="<?= esc($profile, 'attr') ?>" target="_blank" rel="noopener"><?= esc($t('readAll')) ?> <span aria-hidden="true">→</span><?= $tab ?></a>
-    </li>
-    <?php endif ?>
-  </ul>
-  <p class="koe-notice"><?= esc($r['notice']) ?></p>
-  <?php endif ?>
+	<h2 id="koe-title"><?= esc($title) ?></h2>
+	<p class="koe-rating">
+		<strong><?= esc($t('ratingOutOf', ['rating' => \Sayamaapps\Koe\I18n::number($r['rating'])])) ?></strong>
+		<span><?= esc($t('countOn', ['count' => $r['count']])) ?> <?= $attribution ?><?= $viewProfile ?></span>
+	</p>
+	<?php if ($r['reviews'] !== []) : ?>
+	<ul class="koe-list">
+		<?php foreach ($r['reviews'] as $review) : ?>
+		<?php
+		$avatar = $review['avatar'] ? '<img class="koe-avatar" src="' . esc($review['avatar'], 'attr') . '" width="32" height="32" alt="" loading="lazy">' : '';
+		$stars = esc($t('starsOutOf', ['stars' => $review['rating']]), 'attr');
+		$author = $review['url']
+			? '<a href="' . esc($review['url'], 'attr') . '" target="_blank" rel="noopener">' . $avatar . esc($review['name']) . $tab . '</a>'
+			: $avatar . esc($review['name']);
+		?>
+		<li class="koe-review">
+			<p class="koe-stars" role="img" aria-label="<?= $stars ?>"><span aria-hidden="true"><?= str_repeat('★', $review['rating']) ?></span></p>
+			<blockquote><?= nl2br(esc($review['text'])) ?></blockquote>
+			<p class="koe-author"><?= $author ?> · <time datetime="<?= esc($review['date'], 'attr') ?>"><?= esc($review['month']) ?></time></p>
+		</li>
+		<?php endforeach ?>
+		<?php if ($profile && count($r['reviews']) < $r['limit']) : ?>
+		<li class="koe-review koe-more">
+			<p><?= esc($t('reviewsCount', ['count' => $r['count']])) ?></p>
+			<a href="<?= esc($profile, 'attr') ?>" target="_blank" rel="noopener"><?= esc($t('readAll')) ?> <span aria-hidden="true">→</span><?= $tab ?></a>
+		</li>
+		<?php endif ?>
+	</ul>
+	<p class="koe-notice"><?= esc($r['notice']) ?></p>
+	<?php endif ?>
 </section>
