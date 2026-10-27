@@ -1,61 +1,71 @@
 <?php
+
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\TestCase;
+use Sayamaapps\Koe\I18n;
+
 /**
  * Translations: every language has the same keys and placeholders as
  * English, and numbers and months follow the language.
- *   php tests/I18nTest.php
+ *   vendor/bin/phpunit
  */
-require_once __DIR__ . '/../src/I18n.php';
-
-use Koe\I18n;
-
-$checks = 0;
-function expect($expected, $actual, string $what): void
+#[CoversClass(\Sayamaapps\Koe\I18n::class)]
+final class I18nTest extends TestCase
 {
-    global $checks;
-    if ($expected !== $actual) { throw new RuntimeException($what . ': ' . var_export($actual, true)); }
-    $checks++;
-}
-$placeholders = function (string $text): array {
-    preg_match_all('/\{(\w+)\}/', $text, $m);
-    $names = array_unique($m[1]);
-    sort($names);
-    return $names;
-};
+	/** The placeholder names of a text, sorted. */
+	private function placeholders(string $text): array
+	{
+		preg_match_all('/\{(\w+)\}/', $text, $m);
+		$names = array_unique($m[1]);
+		sort($names);
+		return $names;
+	}
 
-try {
-    $en = I18n::table('en');
-    expect(true, count($en) > 10, 'English table loaded');
-    foreach (I18n::LANGUAGES as $language) {
-        $table = I18n::table($language);
-        expect([], array_values(array_diff(array_keys($en), array_keys($table))), "$language: no missing keys");
-        expect([], array_values(array_diff(array_keys($table), array_keys($en))), "$language: no extra keys");
-        foreach ($en as $key => $text) {
-            expect(true, is_string($table[$key]) && trim($table[$key]) !== '', "$language.$key not empty");
-            expect($placeholders($text), $placeholders($table[$key]), "$language.$key: same placeholders as English");
-        }
-    }
-    expect([], I18n::table('fr'), 'unknown language: no table');
+	protected function tearDown(): void
+	{
+		I18n::setLanguage('en');
+	}
 
-    I18n::setLanguage('fr');
-    expect('en', I18n::language(), 'unknown language falls back to English');
-    expect('Read all on Google', I18n::t('readAll'), 'English default');
-    expect('no.such.key', I18n::t('no.such.key'), 'missing key returns the key');
-    expect('201 reviews on', I18n::t('countOn', ['count' => 201]), 'placeholder replaced');
-    expect('4.8', I18n::number(4.8), 'English decimal point');
-    expect('5.0', I18n::number(5), 'one decimal always');
-    expect('July 2026', I18n::monthYear('2026-07-14'), 'English month');
-    expect('2026', I18n::monthYear('2026-13-01'), 'nonsense month: year only');
+	public function testEnglishFormattingAndFallback(): void
+	{
+		I18n::setLanguage('fr');
+		$this->assertSame('en', I18n::language(), 'unknown language falls back to English');
+		$this->assertSame('Read all on Google', I18n::t('readAll'), 'English default');
+		$this->assertSame('no.such.key', I18n::t('no.such.key'), 'missing key returns the key');
+		$this->assertSame('201 reviews on', I18n::t('countOn', ['count' => 201]), 'placeholder replaced');
+		$this->assertSame('4.8', I18n::number(4.8), 'English decimal point');
+		$this->assertSame('5.0', I18n::number(5), 'one decimal always');
+		$this->assertSame('July 2026', I18n::monthYear('2026-07-14'), 'English month');
+		$this->assertSame('2026', I18n::monthYear('2026-13-01'), 'nonsense month: year only');
+	}
 
-    I18n::setLanguage('de');
-    expect('de', I18n::language(), 'German selected');
-    expect('Alle auf Google lesen', I18n::t('readAll'), 'German string');
-    expect('4,8', I18n::number(4.8), 'German decimal comma');
-    expect('Juli 2026', I18n::monthYear('2026-07-14'), 'German month');
-    expect('März 2027', I18n::monthYear('2027-03-01'), 'German month with umlaut');
-    I18n::setLanguage('en');
+	public function testEveryLanguageHasTheEnglishKeysAndPlaceholders(): void
+	{
+		$en = I18n::table('en');
+		$this->assertTrue(count($en) > 10, 'English table loaded');
+		foreach (I18n::LANGUAGES as $language) {
+			$table = I18n::table($language);
+			$this->assertSame([], array_values(array_diff(array_keys($en), array_keys($table))), "$language: no missing keys");
+			$this->assertSame([], array_values(array_diff(array_keys($table), array_keys($en))), "$language: no extra keys");
+			foreach ($en as $key => $text) {
+				$this->assertTrue(is_string($table[$key]) && trim($table[$key]) !== '', "$language.$key not empty");
+				$this->assertSame($this->placeholders($text), $this->placeholders($table[$key]), "$language.$key: same placeholders as English");
+			}
+		}
+	}
 
-    echo "Koe I18n: all $checks checks passed\n";
-} catch (Throwable $e) {
-    fwrite(STDERR, 'Koe I18n: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine() . "\n");
-    exit(1);
+	public function testGermanStringsNumbersAndMonths(): void
+	{
+		I18n::setLanguage('de');
+		$this->assertSame('de', I18n::language(), 'German selected');
+		$this->assertSame('Alle auf Google lesen', I18n::t('readAll'), 'German string');
+		$this->assertSame('4,8', I18n::number(4.8), 'German decimal comma');
+		$this->assertSame('Juli 2026', I18n::monthYear('2026-07-14'), 'German month');
+		$this->assertSame('März 2027', I18n::monthYear('2027-03-01'), 'German month with umlaut');
+	}
+
+	public function testUnknownLanguageHasNoTable(): void
+	{
+		$this->assertSame([], I18n::table('fr'), 'unknown language: no table');
+	}
 }

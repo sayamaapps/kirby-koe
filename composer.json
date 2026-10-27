@@ -1,49 +1,81 @@
 {
     "name": "sayamaapps/kirby-koe",
     "description": "Google reviews for Kirby CMS, cached on your server; visitors' browsers never contact Google.",
-    "type": "kirby-plugin",
     "license": "MIT",
-    "keywords": ["kirby", "kirby-plugin", "kirby-5", "google", "reviews", "places-api", "privacy"],
-    "homepage": "https://github.com/sayamaapps/kirby-koe",
+    "type": "kirby-plugin",
+    "keywords": [
+        "kirby",
+        "kirby-plugin",
+        "kirby-5",
+        "google",
+        "reviews",
+        "places-api",
+        "privacy"
+    ],
     "authors": [
         {
             "name": "Simon Räder",
             "homepage": "https://sayamaapps.de"
         }
     ],
+    "homepage": "https://github.com/sayamaapps/kirby-koe",
     "support": {
         "issues": "https://github.com/sayamaapps/kirby-koe/issues",
         "source": "https://github.com/sayamaapps/kirby-koe"
     },
     "require": {
         "php": "^8.2",
-        "ext-json": "*",
         "ext-mbstring": "*",
         "getkirby/composer-installer": "^1.2"
     },
     "require-dev": {
-        "getkirby/cms": "^5.0"
+        "ergebnis/composer-normalize": "2.54.0",
+        "getkirby/cms": "^5.0",
+        "icanhazstring/composer-unused": "0.9.7",
+        "maglnet/composer-require-checker": "4.17.0",
+        "phpmd/phpmd": "2.15.0",
+        "phpunit/phpunit": "11.5.55",
+        "vimeo/psalm": "6.20.1"
+    },
+    "suggest": {
+        "ext-curl": "Faster Places API requests; without it the streams wrapper is used."
     },
     "bin": [
         "bin/koe-fetch"
     ],
-    "scripts": {
-        "test": "sh tests/run.sh"
-    },
     "config": {
-        "optimize-autoloader": true,
         "allow-plugins": {
+            "ergebnis/composer-normalize": true,
             "getkirby/composer-installer": true
         },
+        "optimize-autoloader": true,
         "platform": {
-            "php": "8.2.0"
-        }
+            "php": "8.2.27"
+        },
+        "sort-packages": true
     },
     "extra": {
         "installer-name": "koe",
-        "kirby-cms-path": false,
         "kirby": {
             "compatible": "^5.0"
-        }
+        },
+        "kirby-cms-path": false
+    },
+    "scripts": {
+        "analyze:phpmd": "vendor/bin/phpmd src,index.php,legacy.php,autoload.php,config,tests github phpmd.xml.dist",
+        "analyze:psalm": "vendor/bin/psalm",
+        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=composer-require-checker.json composer.json",
+        "analyze:unused": "vendor/bin/composer-unused",
+        "ci": [
+            "@composer validate --strict --no-check-version --no-check-all",
+            "@composer normalize --dry-run --no-interaction",
+            "@composer check-platform-reqs",
+            "@analyze:require-checker",
+            "@analyze:unused",
+            "@analyze:psalm",
+            "@analyze:phpmd",
+            "@test"
+        ],
+        "test": "vendor/bin/phpunit"
     }
 }

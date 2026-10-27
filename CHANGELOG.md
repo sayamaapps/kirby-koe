@@ -8,9 +8,54 @@ All notable changes to this project are documented here. Versions follow
   voices after a routine update.
 - **A change to what the cache holds** needs no reader for the old state:
   the cache is fetched anew on the next page view.
-- A change to the privacy text (`DATENSCHUTZ.md` / `PRIVACY.md`) is marked
+- A change to the privacy text (`docs/DATENSCHUTZ.md` / `PRIVACY.md`) is marked
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
+
+## [Unreleased]
+
+Nothing a site has to change. The option keys, the translation keys and the
+old names keep working; the planned changes are listed at the end.
+
+### Added
+
+- **Translation keys `sayamaapps.koe.<key>`**, with the same texts as `koe.<key>`.
+  The `koe.<key>` keys keep working until the next major version.
+
+### Changed
+
+- **Classes are in the namespace `Sayamaapps\Koe`.** The old `Koe\` names are
+  aliases and keep working until the next major version. `Koe\PlacesException`
+  keeps its name: it is declared under it.
+- **The German privacy text is `docs/DATENSCHUTZ.md`.** It is no longer part of
+  the ZIP download.
+- **`koe_option()` is deprecated.** Use `Sayamaapps\Koe\Options::get()`. The
+  function keeps working and raises no notice.
+- **`Plugin::refresh()` and `Plugin::reviews()` take the HTTP client and the
+  refresh runner as optional arguments.** Without them the behaviour is as
+  before. `Plugin::$transport` and `Plugin::$defer` are deprecated; they still
+  work.
+- **The site logic is in `Sayamaapps\Koe\Site`.** The site methods return the
+  same values.
+
+### Removed
+
+- **The startup notice about the pre-1.0 copy of the plugin folder** is gone.
+  Delete that folder if it still exists.
+
+### Fixed
+
+- **`curl_close()` is no longer called.** It has done nothing since PHP 8.0,
+  and PHP 8.5 reports it as deprecated.
+
+### Planned for the next major version
+
+- **Option keys `sayamaapps.koe.<name>`.** They replace `koe.<name>`, which is
+  then no longer read. Sites must rename their keys with the update. Until
+  then `Options::PREFIX` stays `koe.`.
+- **Translation keys:** `koe.<key>` is removed; `sayamaapps.koe.<key>` (added above) stays.
+- **Removal** of the `Koe\` aliases, `koe_option()`, `Plugin::$transport` and
+  `Plugin::$defer`.
 
 ## [2.2.1] — 2026-10-26
 

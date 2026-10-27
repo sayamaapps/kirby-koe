@@ -1,0 +1,32 @@
+{
+    "scan-files": [
+        "index.php",
+        "legacy.php",
+        "autoload.php",
+        "config/*.php",
+        "src/*.php"
+    ],
+    "symbol-whitelist": [
+        "Kirby",
+        "Kirby\\Cache\\Cache",
+        "Kirby\\Cache\\FileCache",
+        "Kirby\\Cms\\App",
+        "Kirby\\Cms\\Helpers",
+        "Kirby\\Filesystem\\F",
+        "Kirby\\Http\\Response",
+        "fastcgi_finish_request",
+        "litespeed_finish_request",
+        "CURLINFO_RESPONSE_CODE",
+        "CURLOPT_HTTPGET",
+        "CURLOPT_HTTPHEADER",
+        "CURLOPT_POST",
+        "CURLOPT_POSTFIELDS",
+        "CURLOPT_RETURNTRANSFER",
+        "CURLOPT_TIMEOUT",
+        "curl_error",
+        "curl_exec",
+        "curl_getinfo",
+        "curl_init",
+        "curl_setopt_array"
+    ]
+}
