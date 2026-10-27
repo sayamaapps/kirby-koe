@@ -1,29 +1,18 @@
 <?php
 
+use DateTimeImmutable;
+use DateTimeZone;
+use FilesystemIterator;
 use Kirby\Cache\FileCache;
 use Kirby\Filesystem\Dir;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use RuntimeException;
 use Sayamaapps\Koe\Places;
 use Sayamaapps\Koe\Reviews;
 use Sayamaapps\Koe\Store;
-
-/** A file cache that runs $afterExists once, right after its first check: the moment another request could slip in. */
-final class InterleavedCache extends FileCache
-{
-	public Closure|null $afterExists = null;
-
-	public function exists(string $key): bool
-	{
-		$found = parent::exists($key);
-		if ($this->afterExists !== null) {
-			$hook = $this->afterExists;
-			$this->afterExists = null;
-			$hook();
-		}
-		return $found;
-	}
-}
 
 /**
  * The cache: one refresh against recorded Places API answers, what is kept
@@ -35,46 +24,19 @@ final class InterleavedCache extends FileCache
 #[CoversClass(\Sayamaapps\Koe\Store::class)]
 final class StoreTest extends TestCase
 {
-	private const KEY = 'AIza-not-a-real-key-0000';
-
 	private const ANNA_PHOTO = 'https://lh3.googleusercontent.com/a/example=s128-c0x00000000-cc-rp-mo';
-
-	private string $tmp;
+	private const KEY = 'AIza-not-a-real-key-0000';
 
 	private FileCache $cache;
 
-	private DateTimeImmutable $today;
-
 	/** Every request the transport answered. */
 	private array $calls = [];
-
-	protected function setUp(): void
-	{
-		$this->tmp = sys_get_temp_dir() . '/koe-store-' . bin2hex(random_bytes(6));
-		$this->cache = new FileCache(['root' => $this->tmp, 'prefix' => 'koe', 'extension' => 'cache']);
-		$this->today = new DateTimeImmutable('2026-10-05', new DateTimeZone('Europe/Berlin'));
-		$this->calls = [];
-	}
-
-	protected function tearDown(): void
-	{
-		Dir::remove($this->tmp);
-		Dir::remove($this->tmp . '-race');
-	}
+	private string $tmp;
+	private DateTimeImmutable $today;
 
 	private function details(): array
 	{
 		return json_decode((string)file_get_contents(__DIR__ . '/fixtures/places-details.json'), true);
-	}
-
-	private function jpeg(): string
-	{
-		return "\xFF\xD8\xFF\xE0" . str_repeat('j', 200);
-	}
-
-	private function settings(): array
-	{
-		return ['placeId' => 'ChIJTestPlace_Id0', 'language' => 'de', 'minutes' => 60];
 	}
 
 	/** Every file below the cache folder, relative. */
@@ -91,32 +53,130 @@ final class StoreTest extends TestCase
 		return $files;
 	}
 
-	/** A Google-like answer: the details (an array = 200 with it, or a Throwable) and the pictures. Records every call. */
-	private function transport(array|Throwable $answer, array $pictures = []): Closure
+	private function jpeg(): string
 	{
-		return function (string $url, array $headers, string|null $body) use ($answer, $pictures): array {
-			$this->calls[] = ['url' => $url, 'headers' => $headers];
-			if (str_starts_with($url, Places::ENDPOINT)) {
-				if ($answer instanceof Throwable) {
-					throw $answer;
-				}
-				return ['status' => 200, 'body' => json_encode($answer)];
-			}
-			$picture = $pictures[$url] ?? ['status' => 404, 'body' => ''];
-			if ($picture instanceof Throwable) {
-				throw $picture;
-			}
-			return $picture;
-		};
+		return "\xFF\xD8\xFF\xE0" . str_repeat('j', 200);
 	}
 
 	/** Answers with the raw status and body, as Google does on errors. */
 	private function raw(int $status, string $raw): Closure
 	{
-		return function (string $url, array $headers, string|null $unused) use ($status, $raw): array {
+		return function (string $url, array $headers) use ($status, $raw): array {
 			$this->calls[] = ['url' => $url, 'headers' => $headers];
 			return ['status' => $status, 'body' => $raw];
 		};
+	}
+
+	private function settings(): array
+	{
+		return ['placeId' => 'ChIJTestPlace_Id0', 'language' => 'de', 'minutes' => 60];
+	}
+
+	protected function setUp(): void
+	{
+		$this->tmp = sys_get_temp_dir() . '/koe-store-' . bin2hex(random_bytes(6));
+		$this->cache = new FileCache(['root' => $this->tmp, 'prefix' => 'koe', 'extension' => 'cache']);
+		$this->today = new DateTimeImmutable('2026-10-05', new DateTimeZone('Europe/Berlin'));
+		$this->calls = [];
+	}
+
+	protected function tearDown(): void
+	{
+		Dir::remove($this->tmp);
+		Dir::remove($this->tmp . '-race');
+	}
+
+	public function testAnswersWithoutTextsOrRatingAreKeptAsTheCurrentState(): void
+	{
+		$key = self::KEY;
+		$rules = Reviews::defaultRules();
+		$settings = $this->settings();
+		$fingerprint = Store::fingerprint($settings, $rules);
+		$problem = Store::refresh($this->cache, $this->transport(['id' => 'ChIJTestPlace_Id0', 'rating' => 2.0, 'userRatingCount' => 9, 'reviews' => []]), $key, $settings, $rules, $this->today);
+		$data = Store::read($this->cache, $fingerprint);
+		$this->assertSame([null, 2.0, 9, []], [$problem, $data['rating'], $data['count'], $data['reviews']], 'empty answer kept as it is');
+		Store::refresh($this->cache, $this->transport(['id' => 'ChIJTestPlace_Id0']), $key, $settings, $rules, $this->today);
+		$data = Store::read($this->cache, $fingerprint);
+		$this->assertSame([null, 0], [$data['rating'], $data['count']], 'no rating at all: kept (the page shows nothing, and does not ask again on every view)');
+	}
+
+	public function testApiErrorIsReportedWithTheKeyScrubbedAndKeepsNothing(): void
+	{
+		$key = self::KEY;
+		$rules = Reviews::defaultRules();
+		$settings = $this->settings();
+		$fingerprint = Store::fingerprint($settings, $rules);
+		$problem = Store::refresh($this->cache, $this->raw(403, json_encode(['error' => ['status' => 'PERMISSION_DENIED', 'message' => 'API key not valid: ' . $key]])), $key, $settings, $rules, $this->today);
+		$this->assertTrue(str_contains((string)$problem, 'Places API answered 403') && !str_contains((string)$problem, $key), 'API error: reported, key scrubbed');
+		$this->assertFalse(Store::claim($this->cache), 'after a failure no new attempt before the retry pause');
+		$this->assertNull(Store::read($this->cache, $fingerprint), 'after a failure nothing is shown');
+		$this->assertSame(['retry.cache'], $this->filesIn($this->tmp . '/koe'), 'after a failure nothing but the retry marker is left (no old reviews kept)');
+	}
+
+	public function testBrokenPicturesAreLeftOutAndThePreviousDataIsGone(): void
+	{
+		$key = self::KEY;
+		$rules = Reviews::defaultRules();
+		$settings = $this->settings();
+		$fingerprint = Store::fingerprint($settings, $rules);
+		$jpeg = $this->jpeg();
+		Store::refresh($this->cache, $this->transport($this->details(), [self::ANNA_PHOTO => ['status' => 200, 'body' => $jpeg]]), $key, $settings, $rules, $this->today);
+		$previousAvatar = Store::read($this->cache, $fingerprint)['reviews'][0]['avatar'];
+
+		// More lenient rules keep more; a picture that is no image, too big or missing is left out, the review stays.
+		$lenient = ['minRating' => 4, 'minLength' => 0, 'maxAgeMonths' => 36, 'maxCount' => 5] + $rules;
+		$pictures = [
+			self::ANNA_PHOTO => ['status' => 200, 'body' => "\x89PNG\r\n\x1A\n" . str_repeat('p', 200)],
+			'https://lh3.googleusercontent.com/a/example2=s128' => ['status' => 200, 'body' => '<html>not an image</html>'],
+			'https://lh3.googleusercontent.com/a/example3=s128' => ['status' => 200, 'body' => "\xFF\xD8\xFF" . str_repeat('x', Store::MAX_AVATAR_BYTES)],
+			'https://lh3.googleusercontent.com/a/example5=s128' => new RuntimeException('timeout'),
+		];
+		$problem = Store::refresh($this->cache, $this->transport($this->details(), $pictures), $key, $settings, $lenient, $this->today);
+		$this->assertNull($problem, 'refresh with broken pictures still succeeds');
+		$data = Store::read($this->cache, Store::fingerprint($settings, $lenient));
+		$this->assertSame(['Carla Kurz', 'Bernd Vier', 'Anna Beispiel', ''], array_column($data['reviews'], 'name'), 'lenient rules keep four');
+		$this->assertSame([false, false, true, false], array_map(fn ($r) => $r['avatar'] !== null, $data['reviews']), 'only the valid picture is kept');
+		$this->assertSame('image/png', Store::avatar($this->cache, $data['reviews'][2]['avatar'])['type'], 'png recognised');
+		$this->assertNull(Store::read($this->cache, $fingerprint), 'the previous data is gone');
+		$this->assertNull(Store::avatar($this->cache, $previousAvatar), 'the previous picture is gone, not left to linger');
+		$this->assertSame(2, count($this->filesIn($this->tmp . '/koe')), 'exactly the data and one picture on disk');
+	}
+
+	public function testDetailsAboutAnotherPlaceAreRefused(): void
+	{
+		$key = self::KEY;
+		$rules = Reviews::defaultRules();
+		$settings = $this->settings();
+		$fingerprint = Store::fingerprint($settings, $rules);
+		$moved = $this->details();
+		$moved['id'] = 'ChIJExampleMoved';
+		$problem = Store::refresh($this->cache, $this->transport($moved), $key, $settings, $rules, $this->today);
+		$this->assertTrue(str_contains((string)$problem, 'ChIJExampleMoved') && str_contains((string)$problem, 'ChIJTestPlace_Id0'), 'details about another place: refused, both ids named');
+		$this->assertNull(Store::read($this->cache, $fingerprint), 'details about another place: nothing kept');
+	}
+
+	public function testEmptyCacheShowsNothingAndOnlyTheFirstVisitorMayRefresh(): void
+	{
+		$fingerprint = Store::fingerprint($this->settings(), Reviews::defaultRules());
+		$this->assertNull(Store::read($this->cache, $fingerprint), 'empty cache: nothing to show');
+		$this->assertTrue(Store::claim($this->cache), 'empty cache: the first visitor may start a refresh');
+		$this->assertFalse(Store::claim($this->cache), 'a second visitor in the meantime may not (no request storm)');
+	}
+
+	public function testExpiredEntryIsGoneOnTheNextRead(): void
+	{
+		$key = self::KEY;
+		$rules = Reviews::defaultRules();
+		$settings = $this->settings();
+		$fingerprint = Store::fingerprint($settings, $rules);
+		Store::refresh($this->cache, $this->transport($this->details(), [self::ANNA_PHOTO => ['status' => 200, 'body' => $this->jpeg()]]), $key, $settings, $rules, $this->today);
+		$file = $this->tmp . '/koe/reviews.cache';
+		$raw = json_decode((string)file_get_contents($file), true);
+		$raw['created'] = time() - 61 * 60;
+		file_put_contents($file, json_encode($raw));
+		$this->assertNull(Store::read($this->cache, $fingerprint), 'expired: nothing shown');
+		$this->assertFalse(is_file($file), 'expired: the file is deleted on that read');
+		$this->assertTrue(Store::claim($this->cache), 'expired: the next visitor starts a refresh');
 	}
 
 	public function testFingerprintIsStableAndNamesEverySetting(): void
@@ -134,12 +194,11 @@ final class StoreTest extends TestCase
 		$this->assertTrue((bool)preg_match('/^[a-f0-9]+$/', $fingerprint), 'fingerprint is plain hex');
 	}
 
-	public function testEmptyCacheShowsNothingAndOnlyTheFirstVisitorMayRefresh(): void
+	public function testNetworkErrorIsReportedWithTheKeyScrubbed(): void
 	{
-		$fingerprint = Store::fingerprint($this->settings(), Reviews::defaultRules());
-		$this->assertNull(Store::read($this->cache, $fingerprint), 'empty cache: nothing to show');
-		$this->assertTrue(Store::claim($this->cache), 'empty cache: the first visitor may start a refresh');
-		$this->assertFalse(Store::claim($this->cache), 'a second visitor in the meantime may not (no request storm)');
+		$key = self::KEY;
+		$problem = Store::refresh($this->cache, $this->transport(new RuntimeException('Could not resolve host (' . $key . ')')), $key, $this->settings(), Reviews::defaultRules(), $this->today);
+		$this->assertTrue(str_contains((string)$problem, 'not reachable') && !str_contains((string)$problem, $key), 'network error: reported, key scrubbed');
 	}
 
 	public function testRefreshKeepsOnlyTheReviewsTheRulesLetThrough(): void
@@ -172,105 +231,27 @@ final class StoreTest extends TestCase
 		$this->assertFalse(str_contains($stored, 'Bernd Vier') || str_contains($stored, 'Carla Kurz') || str_contains($stored, 'googleusercontent'), 'nothing of the reviews not shown, no Google picture address');
 	}
 
-	public function testBrokenPicturesAreLeftOutAndThePreviousDataIsGone(): void
-	{
-		$key = self::KEY;
-		$rules = Reviews::defaultRules();
-		$settings = $this->settings();
-		$fingerprint = Store::fingerprint($settings, $rules);
-		$jpeg = $this->jpeg();
-		Store::refresh($this->cache, $this->transport($this->details(), [self::ANNA_PHOTO => ['status' => 200, 'body' => $jpeg]]), $key, $settings, $rules, $this->today);
-		$previousAvatar = Store::read($this->cache, $fingerprint)['reviews'][0]['avatar'];
-
-		// More lenient rules keep more; a picture that is no image, too big or missing is left out, the review stays.
-		$lenient = ['minRating' => 4, 'minLength' => 0, 'maxAgeMonths' => 36, 'maxCount' => 5] + $rules;
-		$pictures = [
-			self::ANNA_PHOTO => ['status' => 200, 'body' => "\x89PNG\r\n\x1A\n" . str_repeat('p', 200)],
-			'https://lh3.googleusercontent.com/a/example2=s128' => ['status' => 200, 'body' => '<html>not an image</html>'],
-			'https://lh3.googleusercontent.com/a/example3=s128' => ['status' => 200, 'body' => "\xFF\xD8\xFF" . str_repeat('x', Store::MAX_AVATAR_BYTES)],
-			'https://lh3.googleusercontent.com/a/example5=s128' => new RuntimeException('timeout'),
-		];
-		$problem = Store::refresh($this->cache, $this->transport($this->details(), $pictures), $key, $settings, $lenient, $this->today);
-		$this->assertNull($problem, 'refresh with broken pictures still succeeds');
-		$data = Store::read($this->cache, Store::fingerprint($settings, $lenient));
-		$this->assertSame(['Carla Kurz', 'Bernd Vier', 'Anna Beispiel', ''], array_column($data['reviews'], 'name'), 'lenient rules keep four');
-		$this->assertSame([false, false, true, false], array_map(fn ($r) => $r['avatar'] !== null, $data['reviews']), 'only the valid picture is kept');
-		$this->assertSame('image/png', Store::avatar($this->cache, $data['reviews'][2]['avatar'])['type'], 'png recognised');
-		$this->assertNull(Store::read($this->cache, $fingerprint), 'the previous data is gone');
-		$this->assertNull(Store::avatar($this->cache, $previousAvatar), 'the previous picture is gone, not left to linger');
-		$this->assertSame(2, count($this->filesIn($this->tmp . '/koe')), 'exactly the data and one picture on disk');
-	}
-
-	public function testApiErrorIsReportedWithTheKeyScrubbedAndKeepsNothing(): void
-	{
-		$key = self::KEY;
-		$rules = Reviews::defaultRules();
-		$settings = $this->settings();
-		$fingerprint = Store::fingerprint($settings, $rules);
-		$problem = Store::refresh($this->cache, $this->raw(403, json_encode(['error' => ['status' => 'PERMISSION_DENIED', 'message' => 'API key not valid: ' . $key]])), $key, $settings, $rules, $this->today);
-		$this->assertTrue(str_contains((string)$problem, 'Places API answered 403') && !str_contains((string)$problem, $key), 'API error: reported, key scrubbed');
-		$this->assertFalse(Store::claim($this->cache), 'after a failure no new attempt before the retry pause');
-		$this->assertNull(Store::read($this->cache, $fingerprint), 'after a failure nothing is shown');
-		$this->assertSame(['retry.cache'], $this->filesIn($this->tmp . '/koe'), 'after a failure nothing but the retry marker is left (no old reviews kept)');
-	}
-
-	public function testNetworkErrorIsReportedWithTheKeyScrubbed(): void
-	{
-		$key = self::KEY;
-		$problem = Store::refresh($this->cache, $this->transport(new RuntimeException('Could not resolve host (' . $key . ')')), $key, $this->settings(), Reviews::defaultRules(), $this->today);
-		$this->assertTrue(str_contains((string)$problem, 'not reachable') && !str_contains((string)$problem, $key), 'network error: reported, key scrubbed');
-	}
-
-	public function testDetailsAboutAnotherPlaceAreRefused(): void
-	{
-		$key = self::KEY;
-		$rules = Reviews::defaultRules();
-		$settings = $this->settings();
-		$fingerprint = Store::fingerprint($settings, $rules);
-		$moved = $this->details();
-		$moved['id'] = 'ChIJExampleMoved';
-		$problem = Store::refresh($this->cache, $this->transport($moved), $key, $settings, $rules, $this->today);
-		$this->assertTrue(str_contains((string)$problem, 'ChIJExampleMoved') && str_contains((string)$problem, 'ChIJTestPlace_Id0'), 'details about another place: refused, both ids named');
-		$this->assertNull(Store::read($this->cache, $fingerprint), 'details about another place: nothing kept');
-	}
-
-	public function testAnswersWithoutTextsOrRatingAreKeptAsTheCurrentState(): void
-	{
-		$key = self::KEY;
-		$rules = Reviews::defaultRules();
-		$settings = $this->settings();
-		$fingerprint = Store::fingerprint($settings, $rules);
-		$problem = Store::refresh($this->cache, $this->transport(['id' => 'ChIJTestPlace_Id0', 'rating' => 2.0, 'userRatingCount' => 9, 'reviews' => []]), $key, $settings, $rules, $this->today);
-		$data = Store::read($this->cache, $fingerprint);
-		$this->assertSame([null, 2.0, 9, []], [$problem, $data['rating'], $data['count'], $data['reviews']], 'empty answer kept as it is');
-		Store::refresh($this->cache, $this->transport(['id' => 'ChIJTestPlace_Id0']), $key, $settings, $rules, $this->today);
-		$data = Store::read($this->cache, $fingerprint);
-		$this->assertSame([null, 0], [$data['rating'], $data['count']], 'no rating at all: kept (the page shows nothing, and does not ask again on every view)');
-	}
-
-	public function testExpiredEntryIsGoneOnTheNextRead(): void
-	{
-		$key = self::KEY;
-		$rules = Reviews::defaultRules();
-		$settings = $this->settings();
-		$fingerprint = Store::fingerprint($settings, $rules);
-		Store::refresh($this->cache, $this->transport($this->details(), [self::ANNA_PHOTO => ['status' => 200, 'body' => $this->jpeg()]]), $key, $settings, $rules, $this->today);
-		$file = $this->tmp . '/koe/reviews.cache';
-		$raw = json_decode((string)file_get_contents($file), true);
-		$raw['created'] = time() - 61 * 60;
-		file_put_contents($file, json_encode($raw));
-		$this->assertNull(Store::read($this->cache, $fingerprint), 'expired: nothing shown');
-		$this->assertFalse(is_file($file), 'expired: the file is deleted on that read');
-		$this->assertTrue(Store::claim($this->cache), 'expired: the next visitor starts a refresh');
-	}
-
 	public function testTwoRequestsAtTheSameMomentOnlyOneStartsTheRefresh(): void
 	{
 		$key = self::KEY;
 		$rules = Reviews::defaultRules();
 		$settings = $this->settings();
 		$raceRoot = $this->tmp . '-race';
-		$racy = new InterleavedCache(['root' => $raceRoot, 'prefix' => 'koe', 'extension' => 'cache']);
+		// A file cache that runs afterExists once, right after its first check: the moment another request could slip in.
+		$racy = new class (['root' => $raceRoot, 'prefix' => 'koe', 'extension' => 'cache']) extends FileCache {
+			public Closure|null $afterExists = null;
+
+			public function exists(string $key): bool
+			{
+				$found = parent::exists($key);
+				if ($this->afterExists !== null) {
+					$hook = $this->afterExists;
+					$this->afterExists = null;
+					$hook();
+				}
+				return $found;
+			}
+		};
 		$rival = null;
 		$racy->afterExists = function () use (&$rival, $raceRoot): void {
 			// The other request checks and marks between our check and our mark.
@@ -280,5 +261,24 @@ final class StoreTest extends TestCase
 		$this->assertSame(1, (int)$winner + (int)$rival, 'two requests at the same moment: exactly one may start the refresh');
 		// The winner's refresh ends the lock; it fails here on purpose (nothing to keep).
 		Store::refresh($racy, $this->transport(new RuntimeException('Could not resolve host (' . $key . ')')), $key, $settings, $rules, $this->today);
+	}
+
+	/** A Google-like answer: the details (an array = 200 with it, or a Throwable) and the pictures. Records every call. */
+	private function transport(array|Throwable $answer, array $pictures = []): Closure
+	{
+		return function (string $url, array $headers) use ($answer, $pictures): array {
+			$this->calls[] = ['url' => $url, 'headers' => $headers];
+			if (str_starts_with($url, Places::ENDPOINT)) {
+				if ($answer instanceof Throwable) {
+					throw $answer;
+				}
+				return ['status' => 200, 'body' => json_encode($answer)];
+			}
+			$picture = $pictures[$url] ?? ['status' => 404, 'body' => ''];
+			if ($picture instanceof Throwable) {
+				throw $picture;
+			}
+			return $picture;
+		};
 	}
 }

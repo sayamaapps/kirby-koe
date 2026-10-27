@@ -5,6 +5,7 @@ use Kirby\Filesystem\Dir;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 
 /**
  * The names of earlier versions still work: the old class names are aliases

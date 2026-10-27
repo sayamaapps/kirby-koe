@@ -12,11 +12,6 @@ use Sayamaapps\Koe\I18n;
 #[CoversClass(\Sayamaapps\Koe\I18n::class)]
 final class I18nTest extends TestCase
 {
-	protected function tearDown(): void
-	{
-		I18n::setLanguage('en');
-	}
-
 	/** The placeholder names of a text, sorted. */
 	private function placeholders(string $text): array
 	{
@@ -24,6 +19,24 @@ final class I18nTest extends TestCase
 		$names = array_unique($m[1]);
 		sort($names);
 		return $names;
+	}
+
+	protected function tearDown(): void
+	{
+		I18n::setLanguage('en');
+	}
+
+	public function testEnglishFormattingAndFallback(): void
+	{
+		I18n::setLanguage('fr');
+		$this->assertSame('en', I18n::language(), 'unknown language falls back to English');
+		$this->assertSame('Read all on Google', I18n::t('readAll'), 'English default');
+		$this->assertSame('no.such.key', I18n::t('no.such.key'), 'missing key returns the key');
+		$this->assertSame('201 reviews on', I18n::t('countOn', ['count' => 201]), 'placeholder replaced');
+		$this->assertSame('4.8', I18n::number(4.8), 'English decimal point');
+		$this->assertSame('5.0', I18n::number(5), 'one decimal always');
+		$this->assertSame('July 2026', I18n::monthYear('2026-07-14'), 'English month');
+		$this->assertSame('2026', I18n::monthYear('2026-13-01'), 'nonsense month: year only');
 	}
 
 	public function testEveryLanguageHasTheEnglishKeysAndPlaceholders(): void
@@ -41,24 +54,6 @@ final class I18nTest extends TestCase
 		}
 	}
 
-	public function testUnknownLanguageHasNoTable(): void
-	{
-		$this->assertSame([], I18n::table('fr'), 'unknown language: no table');
-	}
-
-	public function testEnglishFormattingAndFallback(): void
-	{
-		I18n::setLanguage('fr');
-		$this->assertSame('en', I18n::language(), 'unknown language falls back to English');
-		$this->assertSame('Read all on Google', I18n::t('readAll'), 'English default');
-		$this->assertSame('no.such.key', I18n::t('no.such.key'), 'missing key returns the key');
-		$this->assertSame('201 reviews on', I18n::t('countOn', ['count' => 201]), 'placeholder replaced');
-		$this->assertSame('4.8', I18n::number(4.8), 'English decimal point');
-		$this->assertSame('5.0', I18n::number(5), 'one decimal always');
-		$this->assertSame('July 2026', I18n::monthYear('2026-07-14'), 'English month');
-		$this->assertSame('2026', I18n::monthYear('2026-13-01'), 'nonsense month: year only');
-	}
-
 	public function testGermanStringsNumbersAndMonths(): void
 	{
 		I18n::setLanguage('de');
@@ -67,5 +62,10 @@ final class I18nTest extends TestCase
 		$this->assertSame('4,8', I18n::number(4.8), 'German decimal comma');
 		$this->assertSame('Juli 2026', I18n::monthYear('2026-07-14'), 'German month');
 		$this->assertSame('März 2027', I18n::monthYear('2027-03-01'), 'German month with umlaut');
+	}
+
+	public function testUnknownLanguageHasNoTable(): void
+	{
+		$this->assertSame([], I18n::table('fr'), 'unknown language: no table');
 	}
 }

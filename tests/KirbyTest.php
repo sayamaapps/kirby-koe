@@ -5,9 +5,12 @@ use Kirby\Filesystem\Dir;
 use Kirby\Template\Snippet;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Sayamaapps\Koe\Options;
 use Sayamaapps\Koe\Places;
 use Sayamaapps\Koe\Plugin;
+use SplFileInfo;
 
 /**
  * The plugin with real Kirby, in a throwaway directory: the switch (off by
@@ -28,21 +31,126 @@ final class KirbyTest extends TestCase
 {
 	private const KEY = 'AIza-not-a-real-key-0000';
 
-	private string $tmp;
-
-	private string $log;
-
 	/** Google's answer to the details call; a raw ['status', 'body'] answers the call as it is. */
 	private array $answer = [];
+
+	/** Every request the transport answered. */
+	private array $calls = [];
+	private string $log;
 
 	/** Picture address → response. */
 	private array $pictures = [];
 
-	/** Every request the transport answered. */
-	private array $calls = [];
-
 	/** Deferred refresh jobs, run by drain(). */
 	private array $queue = [];
+	private string $tmp;
+
+	/** A Kirby app in the throwaway directory with these options. */
+	private function app(array $options): App
+	{
+		Snippet::$cache = []; // Kirby remembers snippet paths per process
+		return new App(['roots' => [
+			'index' => $this->tmp . '/public',
+			'base' => $this->tmp,
+			'content' => $this->tmp . '/content',
+			'site' => $this->tmp . '/site',
+			'storage' => $this->tmp . '/storage',
+		], 'options' => ['url' => 'http://example.invalid'] + $options]);
+	}
+
+	/** Number of cache files, the lock files beside them not counted. */
+	private function cacheFiles(): int
+	{
+		$dir = $this->tmp . '/site/cache';
+		if (!is_dir($dir)) {
+			return 0;
+		}
+		$files = iterator_to_array(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)));
+		return count(array_filter($files, fn (SplFileInfo $file) => !str_ends_with($file->getFilename(), '.lock')));
+	}
+
+	/** Runs the queued refreshes, as after the response. */
+	private function drain(): void
+	{
+		while ($job = array_shift($this->queue)) {
+			$job();
+		}
+	}
+
+	/** Empties the cache and fills it the way a first visitor does: one view, then the queued refresh runs. */
+	private function fill(array $options): void
+	{
+		Dir::remove($this->tmp . '/site/cache');
+		$this->queue = [];
+		$this->firstView($options);
+		$this->drain();
+	}
+
+	/**
+	 * A page view that finds nothing cached: returns [koeReviews() result, Kirby].
+	 * The refresh is only queued, never started.
+	 *
+	 * @return array{0: array|null, 1: App}
+	 */
+	private function firstView(array $options): array
+	{
+		$kirby = $this->app($options);
+		return [Plugin::reviews($kirby, Options::rules($kirby), $this->transport(), $this->queueing()), $kirby];
+	}
+
+	private function jpeg(): string
+	{
+		return "\xFF\xD8\xFF\xE0" . str_repeat('j', 100);
+	}
+
+	/** The log written so far, emptied. */
+	private function logged(): string
+	{
+		$text = is_file($this->log) ? (string)file_get_contents($this->log) : '';
+		file_put_contents($this->log, '');
+		return $text;
+	}
+
+	/** The options that switch the module on for the place, with the key. */
+	private function on(): array
+	{
+		return ['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY];
+	}
+
+	/** Puts the refresh into the queue instead of running it after the response. */
+	private function queueing(): Closure
+	{
+		return function (Closure $job): void {
+			$this->queue[] = $job;
+		};
+	}
+
+	/**
+	 * Renders the default snippet as a page does, entities decoded.
+	 * Returns [koeReviews(), HTML, Kirby]. Only on a filled cache: an empty
+	 * one would start a refresh, which is not run here.
+	 *
+	 * @return array{0: array|null, 1: string, 2: App}
+	 */
+	private function render(array $options, array $snippetData = []): array
+	{
+		$kirby = $this->app($options);
+		$html = html_entity_decode((string)$kirby->snippet('koe/reviews', $snippetData, true));
+		return [$kirby->site()->koeReviews(), $html, $kirby];
+	}
+
+	/** One review of a Places details answer. */
+	private function review(string $name, string $ago, string|null $url = null, int $rating = 5, string|null $id = null, string|null $photo = null): array
+	{
+		return array_filter([
+			'name' => $id === null ? null : 'places/ChIJExample/reviews/' . $id,
+			'rating' => $rating,
+			'originalText' => ['text' => str_repeat('Friendly, competent and fast, happy to come back. ', 3)],
+			'authorAttribution' => array_filter(['displayName' => $name, 'photoUri' => $photo]),
+			'publishTime' => date('Y-m-d', strtotime($ago)) . 'T10:00:00Z',
+			'googleMapsUri' => $url,
+		], fn ($v) => $v !== null);
+	}
 
 	protected function setUp(): void
 	{
@@ -57,19 +165,6 @@ final class KirbyTest extends TestCase
 			$this->review('Four Stars', '-5 days', null, 4, 'id-four'),
 		]];
 		$this->pictures = ['https://lh3.googleusercontent.com/a/with=s128' => ['status' => 200, 'body' => $this->jpeg()]];
-	}
-
-	protected function tearDown(): void
-	{
-		Snippet::$cache = [];
-		Dir::remove($this->tmp . '/site/cache');
-		Dir::remove($this->tmp . '/site/snippets');
-		if (is_file($this->log)) {
-			unlink($this->log);
-		}
-		ini_restore('error_log');
-		unset($_SERVER['GOOGLE_PLACES_API_KEY']);
-		putenv('GOOGLE_PLACES_API_KEY');
 	}
 
 	/**
@@ -94,168 +189,51 @@ final class KirbyTest extends TestCase
 		return $root;
 	}
 
-	/** One review of a Places details answer. */
-	private function review(string $name, string $ago, string|null $url = null, int $rating = 5, string|null $id = null, string|null $photo = null): array
+	protected function tearDown(): void
 	{
-		return array_filter([
-			'name' => $id === null ? null : 'places/ChIJExample/reviews/' . $id,
-			'rating' => $rating,
-			'originalText' => ['text' => str_repeat('Friendly, competent and fast, happy to come back. ', 3)],
-			'authorAttribution' => array_filter(['displayName' => $name, 'photoUri' => $photo]),
-			'publishTime' => date('Y-m-d', strtotime($ago)) . 'T10:00:00Z',
-			'googleMapsUri' => $url,
-		], fn ($v) => $v !== null);
-	}
-
-	private function jpeg(): string
-	{
-		return "\xFF\xD8\xFF\xE0" . str_repeat('j', 100);
-	}
-
-	/** The options that switch the module on for the place, with the key. */
-	private function on(): array
-	{
-		return ['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY];
-	}
-
-	/** A Kirby app in the throwaway directory with these options. */
-	private function app(array $options): App
-	{
-		Snippet::$cache = []; // Kirby remembers snippet paths per process
-		return new App(['roots' => [
-			'index' => $this->tmp . '/public',
-			'base' => $this->tmp,
-			'content' => $this->tmp . '/content',
-			'site' => $this->tmp . '/site',
-			'storage' => $this->tmp . '/storage',
-		], 'options' => ['url' => 'http://example.invalid'] + $options]);
-	}
-
-	/** Google's answer: the details of ChIJExample (or the raw answer), and the pictures. Records every call. */
-	private function transport(): Closure
-	{
-		return function (string $url, array $headers, string|null $body): array {
-			$this->calls[] = ['url' => $url, 'headers' => $headers];
-			if (str_starts_with($url, Places::ENDPOINT)) {
-				return isset($this->answer['status']) ? $this->answer : ['status' => 200, 'body' => json_encode($this->answer)];
-			}
-			return $this->pictures[$url] ?? ['status' => 404, 'body' => ''];
-		};
-	}
-
-	/** Puts the refresh into the queue instead of running it after the response. */
-	private function queueing(): Closure
-	{
-		return function (Closure $job): void {
-			$this->queue[] = $job;
-		};
-	}
-
-	/** Runs the queued refreshes, as after the response. */
-	private function drain(): void
-	{
-		while ($job = array_shift($this->queue)) {
-			$job();
-		}
-	}
-
-	/**
-	 * A page view that finds nothing cached: returns [koeReviews() result, Kirby].
-	 * The refresh is only queued, never started.
-	 *
-	 * @return array{0: array|null, 1: App}
-	 */
-	private function firstView(array $options): array
-	{
-		$kirby = $this->app($options);
-		return [Plugin::reviews($kirby, Options::rules($kirby), $this->transport(), $this->queueing()), $kirby];
-	}
-
-	/** Empties the cache and fills it the way a first visitor does: one view, then the queued refresh runs. */
-	private function fill(array $options): void
-	{
+		Snippet::$cache = [];
 		Dir::remove($this->tmp . '/site/cache');
-		$this->queue = [];
-		$this->firstView($options);
-		$this->drain();
-	}
-
-	/**
-	 * Renders the default snippet as a page does, entities decoded.
-	 * Returns [koeReviews(), HTML, Kirby]. Only on a filled cache: an empty
-	 * one would start a refresh, which is not run here.
-	 *
-	 * @return array{0: array|null, 1: string, 2: App}
-	 */
-	private function render(array $options, array $snippetData = []): array
-	{
-		$kirby = $this->app($options);
-		$html = html_entity_decode((string)$kirby->snippet('koe/reviews', $snippetData, true));
-		return [$kirby->site()->koeReviews(), $html, $kirby];
-	}
-
-	/** Number of cache files, the lock files beside them not counted. */
-	private function cacheFiles(): int
-	{
-		$dir = $this->tmp . '/site/cache';
-		if (!is_dir($dir)) {
-			return 0;
+		Dir::remove($this->tmp . '/site/snippets');
+		if (is_file($this->log)) {
+			unlink($this->log);
 		}
-		$files = iterator_to_array(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)));
-		return count(array_filter($files, fn (SplFileInfo $file) => !str_ends_with($file->getFilename(), '.lock')));
+		ini_restore('error_log');
+		unset($_SERVER['GOOGLE_PLACES_API_KEY']);
+		putenv('GOOGLE_PLACES_API_KEY');
 	}
 
-	/** The log written so far, emptied. */
-	private function logged(): string
+	public function testAnswerWithoutAnyRatingShowsNothingAndDoesNotAskAgain(): void
 	{
-		$text = is_file($this->log) ? (string)file_get_contents($this->log) : '';
-		file_put_contents($this->log, '');
-		return $text;
+		unset($this->answer['rating'], $this->answer['userRatingCount']);
+		$this->fill($this->on());
+		[$r, $html] = $this->render($this->on());
+		$this->assertTrue($r === null && trim($html) === '' && $this->queue === [], 'no rating at all: nothing shown, and no refresh on every view');
 	}
 
-	public function testSwitchedOffByDefaultNothingIsShownOrFetched(): void
+	public function testAnswerWithoutTextsShowsRatingAndCount(): void
 	{
-		[$r, $html, $kirby] = $this->render(['sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
-		$this->assertTrue($kirby->plugin('sayamaapps/koe') !== null, 'plugin sayamaapps/koe registered');
-		$this->assertNull($r, 'without koe.active koeReviews() is null');
-		$this->assertSame('', trim($html), 'without koe.active the snippet prints nothing');
-		$this->assertSame([], $this->queue, 'without koe.active nothing is fetched');
-		$this->assertSame('Read all on Google', $kirby->translation('en')->get('sayamaapps.koe.readAll'), 'strings registered as Kirby translations');
-		$this->assertSame('Alle auf Google lesen', $kirby->translation('de')->get('sayamaapps.koe.readAll'), 'German Kirby translation');
-		$this->assertTrue(function_exists('koe_option'), 'koe_option() helper');
-		[$r] = $this->render(['sayamaapps.koe.active' => 'yes'] + $this->on());
-		$this->assertNull($r, 'sayamaapps.koe.active = "yes" must not switch on');
-		$this->assertSame([], $this->queue, 'sayamaapps.koe.active = "yes": nothing fetched');
+		$this->answer['reviews'] = [];
+		$this->answer['rating'] = 2.0;
+		$this->answer['userRatingCount'] = 9;
+		$this->fill($this->on());
+		[$r, $html] = $this->render($this->on());
+		$this->assertTrue($r !== null && $r['reviews'] === [] && $r['rating'] === 2.0 && $r['count'] === 9, 'empty review list: rating and count');
+		$this->assertTrue(str_contains($html, '<strong>2.0 out of 5</strong>') && !str_contains($html, '<ul'), 'empty review list: rendered without list');
 	}
 
-	public function testWithoutPlaceIdOrKeyNothingIsFetchedAndDebugModeSaysWhy(): void
+	public function testApprovedListTileTitleAndLogo(): void
 	{
-		$this->logged();
-		[$r, $html] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.key' => self::KEY, 'debug' => true]);
-		$this->assertTrue($r === null && trim($html) === '' && $this->queue === [], 'no koe.placeId: nothing shown, nothing fetched');
-		$this->assertTrue(str_contains($this->logged(), 'sayamaapps.koe.placeId is not set'), 'no koe.placeId: debug log says so');
-		[$r] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'debug' => true]);
-		$this->assertTrue($r === null && $this->queue === [], 'no key: nothing shown, nothing fetched');
-		$this->assertTrue(str_contains($this->logged(), 'no API key'), 'no key: debug log says so');
-		[$r] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample']);
-		$this->assertSame('', $this->logged(), 'without debug nothing is logged for a missing key');
-	}
-
-	public function testFirstViewShowsNothingAndQueuesOneRefreshThatFillsTheCache(): void
-	{
-		[$r, $kirby] = $this->firstView($this->on());
-		$this->assertNull($r, 'empty cache: the first view shows nothing');
-		$this->assertSame('', trim(html_entity_decode((string)$kirby->snippet('koe/reviews', [], true))), 'empty cache: the snippet prints nothing');
-		$this->assertCount(1, $this->queue, 'empty cache: one refresh queued, not two (snippet and method both asked)');
-		$this->assertSame([], $this->calls, 'empty cache: no request during the page view');
-		$this->assertFalse($kirby->response()->cache(), 'empty cache: the page without reviews is not put into Kirby\'s page cache');
-		$this->firstView($this->on());
-		$this->assertCount(1, $this->queue, 'a second view before the refresh ran: no second refresh');
-		$this->drain();
-		$this->assertSame(Places::ENDPOINT . 'places/ChIJExample?languageCode=en', $this->calls[0]['url'], 'the refresh asks for the details of koe.placeId, in the site language');
-		$this->assertTrue(in_array('X-Goog-Api-Key: ' . self::KEY, $this->calls[0]['headers'], true), 'the refresh uses koe.key');
-		$this->assertSame([], $this->calls[1]['headers'], 'the picture is fetched without the key');
-		$this->assertTrue(is_dir($this->tmp . '/site/cache') && !is_dir($this->tmp . '/site/data') && !is_dir($this->tmp . '/content/reviews'), 'kept in site/cache, nowhere else');
+		$approved = ['sayamaapps.koe.approved' => ['id-without']] + $this->on();
+		$this->fill($approved);
+		[$r, $html] = $this->render($approved, ['title' => 'What our customers say', 'logo' => 'assets/GoogleMaps_Logo_Gray.svg']);
+		$this->assertSame(['Without Link'], array_column($r['reviews'], 'name'), 'approved list');
+		$this->assertTrue(str_contains($html, 'Read all on Google') && str_contains($html, '<p>201 reviews</p>'), 'tile with count below three reviews');
+		$this->assertTrue(str_contains($html, '>What our customers say</h2>'), 'title from snippet data');
+		$this->assertTrue((bool)preg_match('~<img class="koe-logo" src="[^"]*/assets/GoogleMaps_Logo_Gray\.svg"[^>]*alt="Google Maps">~', $html), 'logo with alt text');
+		[, $html] = $this->render($approved + ['sayamaapps.koe.title' => 'Voices', 'sayamaapps.koe.logo' => 'assets/logo.svg']);
+		$this->assertTrue(str_contains($html, '>Voices</h2>') && str_contains($html, '/assets/logo.svg"'), 'title and logo from options');
+		[, $html] = $this->render($approved + ['sayamaapps.koe.logo' => 'assets/logo.svg'], ['logo' => null]);
+		$this->assertTrue(str_contains($html, '/assets/logo.svg"'), 'snippet data null falls back to the option');
 	}
 
 	public function testCachedReviewsAreShownWithoutAnyRequest(): void
@@ -286,20 +264,108 @@ final class KirbyTest extends TestCase
 		$this->assertTrue((bool)preg_match('~<time datetime="\d{4}-\d{2}-\d{2}">[A-Z][a-z]+ \d{4}</time>~', $html), 'English month and year');
 	}
 
-	public function testPictureRouteServesTheCachedPictureOrNothing(): void
+	public function testChangedRulesOrPlaceAreFetchedAnew(): void
 	{
 		$this->fill($this->on());
-		[$r, , $kirby] = $this->render($this->on());
-		$with = $r['reviews'][0];
-		$response = $kirby->call('koe/avatar/' . basename($with['avatar']));
-		$this->assertSame([200, 'image/jpeg', $this->jpeg()], [$response->code(), $response->type(), $response->body()], 'picture served from the own server');
-		$this->assertTrue((bool)preg_match('/^public, max-age=(\d+)$/', (string)($response->headers()['Cache-Control'] ?? ''), $m) && (int)$m[1] > 23 * 3600 && (int)$m[1] <= 24 * 3600, 'browser may keep it only as long as the cache');
-		$expires = strtotime((string)($response->headers()['Expires'] ?? ''));
-		$this->assertTrue($expires !== false && $expires > time() + 23 * 3600 && $expires <= time() + 24 * 3600 + 5, 'Expires matches, so mod_expires adds no year');
-		$this->assertSame('nosniff', $response->headers()['X-Content-Type-Options'] ?? null, 'nosniff');
-		$this->assertSame(404, $kirby->call('koe/avatar/ffffffffffffffffffffffffffffffff')->code(), 'unknown picture: 404');
-		[, , $off] = $this->render(['sayamaapps.koe.active' => false] + $this->on());
-		$this->assertSame(404, $off->call('koe/avatar/' . basename($with['avatar']))->code(), 'module off: 404');
+		$this->queue = [];
+		[$r] = $this->firstView(['sayamaapps.koe.minRating' => 4] + $this->on());
+		$this->assertTrue($r === null && count($this->queue) === 1, 'other rules than cached: nothing shown, refresh queued');
+		$this->drain();
+		[$r] = $this->render(['sayamaapps.koe.minRating' => 4] + $this->on());
+		$this->assertSame(['Four Stars', 'With Link', 'Without Link'], array_column($r['reviews'], 'name'), 'refreshed for the new rules');
+		$this->queue = [];
+		[$r] = $this->firstView(['sayamaapps.koe.placeId' => 'ChIJOther'] + $this->on());
+		$this->assertTrue($r === null && count($this->queue) === 1, 'other place than cached: nothing shown, refresh queued');
+	}
+
+	public function testDebugModeRendersTheDefaultSnippetWithoutDeprecation(): void
+	{
+		// The title and logo come from the new option names: koe_option() would raise a deprecation here.
+		$options = ['debug' => true, 'sayamaapps.koe.title' => 'Voices', 'sayamaapps.koe.logo' => 'assets/logo.svg'] + $this->on();
+		$this->fill($options);
+		$deprecations = [];
+		set_error_handler(function (int $level, string $message) use (&$deprecations): bool {
+			if ($level === E_USER_DEPRECATED) {
+				$deprecations[] = $message;
+			}
+			return true;
+		});
+		try {
+			[, $html] = $this->render($options);
+		} finally {
+			restore_error_handler();
+		}
+		$this->assertSame([], $deprecations, 'the default snippet raises no deprecation in debug mode');
+		$this->assertTrue(str_contains($html, '<h2 id="koe-title">Voices</h2>'), 'title from the option');
+		$this->assertTrue(str_contains($html, '<img class="koe-logo" src="http://example.invalid/assets/logo.svg"'), 'logo from the option');
+	}
+
+	public function testEmptyApprovalAndNestedSpelling(): void
+	{
+		$none = ['sayamaapps.koe.approved' => []] + $this->on();
+		$this->fill($none);
+		[$r, $html] = $this->render($none);
+		$this->assertSame([], $r['reviews'], 'approved []: no single review');
+		$this->assertTrue(str_contains($html, '4.8 out of 5') && !str_contains($html, '<ul') && !str_contains($html, 'koe-notice'), 'approved []: rating and count still shown, no list, no notice');
+		$nested = ['koe' => ['active' => true, 'placeId' => 'ChIJExample', 'key' => self::KEY, 'approved' => ['id-with', 'id-four'], 'minRating' => 4]];
+		$this->fill($nested);
+		[$r] = $this->render($nested);
+		$this->assertSame(['Four Stars', 'With Link'], array_column($r['reviews'], 'name'), 'nested spelling, approved with lower rating');
+	}
+
+	public function testFailedRefreshIsLoggedWithoutDebugAndKeepsTheCacheEmpty(): void
+	{
+		$on = $this->on();
+		Dir::remove($this->tmp . '/site/cache');
+		$this->answer = ['status' => 403, 'body' => json_encode(['error' => ['status' => 'PERMISSION_DENIED', 'message' => 'API key not valid: ' . self::KEY]])];
+		$this->logged();
+		$this->firstView($on);
+		$this->drain();
+		$text = $this->logged();
+		$this->assertTrue(str_contains($text, 'koe: fetching the reviews failed: Places API answered 403') && !str_contains($text, self::KEY), 'failure logged, key scrubbed');
+		[$r] = $this->firstView($on);
+		$this->assertTrue($r === null && $this->queue === [], 'after a failure: nothing shown, no new attempt during the pause');
+		$this->assertSame(1, $this->cacheFiles(), 'after a failure only the retry marker is left');
+	}
+
+	public function testFirstViewShowsNothingAndQueuesOneRefreshThatFillsTheCache(): void
+	{
+		[$r, $kirby] = $this->firstView($this->on());
+		$this->assertNull($r, 'empty cache: the first view shows nothing');
+		$this->assertSame('', trim(html_entity_decode((string)$kirby->snippet('koe/reviews', [], true))), 'empty cache: the snippet prints nothing');
+		$this->assertCount(1, $this->queue, 'empty cache: one refresh queued, not two (snippet and method both asked)');
+		$this->assertSame([], $this->calls, 'empty cache: no request during the page view');
+		$this->assertFalse($kirby->response()->cache(), 'empty cache: the page without reviews is not put into Kirby\'s page cache');
+		$this->firstView($this->on());
+		$this->assertCount(1, $this->queue, 'a second view before the refresh ran: no second refresh');
+		$this->drain();
+		$this->assertSame(Places::ENDPOINT . 'places/ChIJExample?languageCode=en', $this->calls[0]['url'], 'the refresh asks for the details of koe.placeId, in the site language');
+		$this->assertTrue(in_array('X-Goog-Api-Key: ' . self::KEY, $this->calls[0]['headers'], true), 'the refresh uses koe.key');
+		$this->assertSame([], $this->calls[1]['headers'], 'the picture is fetched without the key');
+		$this->assertTrue(is_dir($this->tmp . '/site/cache') && !is_dir($this->tmp . '/site/data') && !is_dir($this->tmp . '/content/reviews'), 'kept in site/cache, nowhere else');
+	}
+
+	public function testGermanFromLocaleOrLanguageOption(): void
+	{
+		$this->calls = [];
+		$this->fill(['locale' => 'de_DE.UTF-8'] + $this->on());
+		$this->assertSame(Places::ENDPOINT . 'places/ChIJExample?languageCode=de', $this->calls[0]['url'], 'German site asks in German');
+		[, $html] = $this->render(['locale' => 'de_DE.UTF-8'] + $this->on());
+		$this->assertTrue(str_contains($html, '<strong>4,8 von 5</strong>') && str_contains($html, '201 Bewertungen auf Google Maps') && str_contains($html, 'Profil ansehen') && str_contains($html, '(öffnet neuen Tab)'), 'German via locale');
+		$this->assertTrue(str_contains($html, '>Bewertungen auf Google</h2>'), 'German default title');
+		$this->fill(['locale' => 'de_DE', 'sayamaapps.koe.language' => 'en'] + $this->on());
+		[, $html] = $this->render(['locale' => 'de_DE', 'sayamaapps.koe.language' => 'en'] + $this->on());
+		$this->assertTrue(str_contains($html, '4.8 out of 5'), 'sayamaapps.koe.language wins over locale');
+	}
+
+	public function testHoldingTimeFromCacheHours(): void
+	{
+		foreach ([[2, 2], [0, 1], [48, 24], ['6', 6]] as [$hours, $expected]) {
+			$this->fill(['sayamaapps.koe.cacheHours' => $hours] + $this->on());
+			[, , $kirby] = $this->render(['sayamaapps.koe.cacheHours' => $hours] + $this->on());
+			$left = $kirby->response()->expires() - time();
+			$this->assertTrue($left > ($expected * 3600 - 120) && $left <= $expected * 3600, "sayamaapps.koe.cacheHours $hours → $expected h");
+		}
 	}
 
 	public function testKeyComesFromTheEnvironmentOrAClosure(): void
@@ -318,109 +384,10 @@ final class KirbyTest extends TestCase
 		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-from-closure', $this->calls[0]['headers'] ?? [], true), 'sayamaapps.koe.key as closure');
 	}
 
-	public function testHoldingTimeFromCacheHours(): void
-	{
-		foreach ([[2, 2], [0, 1], [48, 24], ['6', 6]] as [$hours, $expected]) {
-			$this->fill(['sayamaapps.koe.cacheHours' => $hours] + $this->on());
-			[, , $kirby] = $this->render(['sayamaapps.koe.cacheHours' => $hours] + $this->on());
-			$left = $kirby->response()->expires() - time();
-			$this->assertTrue($left > ($expected * 3600 - 120) && $left <= $expected * 3600, "sayamaapps.koe.cacheHours $hours → $expected h");
-		}
-	}
-
-	public function testChangedRulesOrPlaceAreFetchedAnew(): void
-	{
-		$this->fill($this->on());
-		$this->queue = [];
-		[$r] = $this->firstView(['sayamaapps.koe.minRating' => 4] + $this->on());
-		$this->assertTrue($r === null && count($this->queue) === 1, 'other rules than cached: nothing shown, refresh queued');
-		$this->drain();
-		[$r] = $this->render(['sayamaapps.koe.minRating' => 4] + $this->on());
-		$this->assertSame(['Four Stars', 'With Link', 'Without Link'], array_column($r['reviews'], 'name'), 'refreshed for the new rules');
-		$this->queue = [];
-		[$r] = $this->firstView(['sayamaapps.koe.placeId' => 'ChIJOther'] + $this->on());
-		$this->assertTrue($r === null && count($this->queue) === 1, 'other place than cached: nothing shown, refresh queued');
-	}
-
-	public function testFailedRefreshIsLoggedWithoutDebugAndKeepsTheCacheEmpty(): void
-	{
-		$on = $this->on();
-		Dir::remove($this->tmp . '/site/cache');
-		$this->answer = ['status' => 403, 'body' => json_encode(['error' => ['status' => 'PERMISSION_DENIED', 'message' => 'API key not valid: ' . self::KEY]])];
-		$this->logged();
-		$this->firstView($on);
-		$this->drain();
-		$text = $this->logged();
-		$this->assertTrue(str_contains($text, 'koe: fetching the reviews failed: Places API answered 403') && !str_contains($text, self::KEY), 'failure logged, key scrubbed');
-		[$r] = $this->firstView($on);
-		$this->assertTrue($r === null && $this->queue === [], 'after a failure: nothing shown, no new attempt during the pause');
-		$this->assertSame(1, $this->cacheFiles(), 'after a failure only the retry marker is left');
-	}
-
-	public function testGermanFromLocaleOrLanguageOption(): void
-	{
-		$this->calls = [];
-		$this->fill(['locale' => 'de_DE.UTF-8'] + $this->on());
-		$this->assertSame(Places::ENDPOINT . 'places/ChIJExample?languageCode=de', $this->calls[0]['url'], 'German site asks in German');
-		[, $html] = $this->render(['locale' => 'de_DE.UTF-8'] + $this->on());
-		$this->assertTrue(str_contains($html, '<strong>4,8 von 5</strong>') && str_contains($html, '201 Bewertungen auf Google Maps') && str_contains($html, 'Profil ansehen') && str_contains($html, '(öffnet neuen Tab)'), 'German via locale');
-		$this->assertTrue(str_contains($html, '>Bewertungen auf Google</h2>'), 'German default title');
-		$this->fill(['locale' => 'de_DE', 'sayamaapps.koe.language' => 'en'] + $this->on());
-		[, $html] = $this->render(['locale' => 'de_DE', 'sayamaapps.koe.language' => 'en'] + $this->on());
-		$this->assertTrue(str_contains($html, '4.8 out of 5'), 'sayamaapps.koe.language wins over locale');
-	}
-
-	public function testApprovedListTileTitleAndLogo(): void
-	{
-		$approved = ['sayamaapps.koe.approved' => ['id-without']] + $this->on();
-		$this->fill($approved);
-		[$r, $html] = $this->render($approved, ['title' => 'What our customers say', 'logo' => 'assets/GoogleMaps_Logo_Gray.svg']);
-		$this->assertSame(['Without Link'], array_column($r['reviews'], 'name'), 'approved list');
-		$this->assertTrue(str_contains($html, 'Read all on Google') && str_contains($html, '<p>201 reviews</p>'), 'tile with count below three reviews');
-		$this->assertTrue(str_contains($html, '>What our customers say</h2>'), 'title from snippet data');
-		$this->assertTrue((bool)preg_match('~<img class="koe-logo" src="[^"]*/assets/GoogleMaps_Logo_Gray\.svg"[^>]*alt="Google Maps">~', $html), 'logo with alt text');
-		[, $html] = $this->render($approved + ['sayamaapps.koe.title' => 'Voices', 'sayamaapps.koe.logo' => 'assets/logo.svg']);
-		$this->assertTrue(str_contains($html, '>Voices</h2>') && str_contains($html, '/assets/logo.svg"'), 'title and logo from options');
-		[, $html] = $this->render($approved + ['sayamaapps.koe.logo' => 'assets/logo.svg'], ['logo' => null]);
-		$this->assertTrue(str_contains($html, '/assets/logo.svg"'), 'snippet data null falls back to the option');
-	}
-
-	public function testEmptyApprovalAndNestedSpelling(): void
-	{
-		$none = ['sayamaapps.koe.approved' => []] + $this->on();
-		$this->fill($none);
-		[$r, $html] = $this->render($none);
-		$this->assertSame([], $r['reviews'], 'approved []: no single review');
-		$this->assertTrue(str_contains($html, '4.8 out of 5') && !str_contains($html, '<ul') && !str_contains($html, 'koe-notice'), 'approved []: rating and count still shown, no list, no notice');
-		$nested = ['koe' => ['active' => true, 'placeId' => 'ChIJExample', 'key' => self::KEY, 'approved' => ['id-with', 'id-four'], 'minRating' => 4]];
-		$this->fill($nested);
-		[$r] = $this->render($nested);
-		$this->assertSame(['Four Stars', 'With Link'], array_column($r['reviews'], 'name'), 'nested spelling, approved with lower rating');
-	}
-
-	public function testAnswerWithoutTextsShowsRatingAndCount(): void
-	{
-		$this->answer['reviews'] = [];
-		$this->answer['rating'] = 2.0;
-		$this->answer['userRatingCount'] = 9;
-		$this->fill($this->on());
-		[$r, $html] = $this->render($this->on());
-		$this->assertTrue($r !== null && $r['reviews'] === [] && $r['rating'] === 2.0 && $r['count'] === 9, 'empty review list: rating and count');
-		$this->assertTrue(str_contains($html, '<strong>2.0 out of 5</strong>') && !str_contains($html, '<ul'), 'empty review list: rendered without list');
-	}
-
-	public function testAnswerWithoutAnyRatingShowsNothingAndDoesNotAskAgain(): void
-	{
-		unset($this->answer['rating'], $this->answer['userRatingCount']);
-		$this->fill($this->on());
-		[$r, $html] = $this->render($this->on());
-		$this->assertTrue($r === null && trim($html) === '' && $this->queue === [], 'no rating at all: nothing shown, and no refresh on every view');
-	}
-
 	public function testNoticeIsWordedFromTheOptions(): void
 	{
 		$this->answer = ['id' => 'ChIJExample', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => [$this->review('Notice', '-3 days', null, 5, 'id-notice')]];
-		$noticeOf = fn (string $html): ?string => preg_match('~<p class="koe-notice">(.*?)</p>~s', $html, $m) ? $m[1] : null;
+		$noticeOf = fn (string $html): string|null => preg_match('~<p class="koe-notice">(.*?)</p>~s', $html, $m) ? $m[1] : null;
 		$defaultEn = 'Selection: 5 stars, 80+ characters, at most 24 months old, newest first.';
 		$this->fill($this->on());
 		[$r, $html] = $this->render($this->on());
@@ -434,24 +401,20 @@ final class KirbyTest extends TestCase
 		$this->assertFalse(str_contains((string)file_get_contents(dirname(__DIR__) . '/snippets/reviews.php'), 'at least 80'), 'the snippet itself carries no fixed rule text');
 	}
 
-	public function testDebugModeRendersTheDefaultSnippetWithoutDeprecation(): void
+	public function testPictureRouteServesTheCachedPictureOrNothing(): void
 	{
-		// The title and logo come from the new option names: koe_option() would raise a deprecation here.
-		$options = ['debug' => true, 'sayamaapps.koe.title' => 'Voices', 'sayamaapps.koe.logo' => 'assets/logo.svg'] + $this->on();
-		$this->fill($options);
-		$deprecations = [];
-		set_error_handler(function (int $level, string $message) use (&$deprecations): bool {
-			$deprecations[] = $message;
-			return true;
-		});
-		try {
-			[, $html] = $this->render($options);
-		} finally {
-			restore_error_handler();
-		}
-		$this->assertSame([], $deprecations, 'the default snippet raises no deprecation in debug mode');
-		$this->assertTrue(str_contains($html, '<h2 id="koe-title">Voices</h2>'), 'title from the option');
-		$this->assertTrue(str_contains($html, '<img class="koe-logo" src="http://example.invalid/assets/logo.svg"'), 'logo from the option');
+		$this->fill($this->on());
+		[$r, , $kirby] = $this->render($this->on());
+		$with = $r['reviews'][0];
+		$response = $kirby->call('koe/avatar/' . basename($with['avatar']));
+		$this->assertSame([200, 'image/jpeg', $this->jpeg()], [$response->code(), $response->type(), $response->body()], 'picture served from the own server');
+		$this->assertTrue((bool)preg_match('/^public, max-age=(\d+)$/', (string)($response->headers()['Cache-Control'] ?? ''), $m) && (int)$m[1] > 23 * 3600 && (int)$m[1] <= 24 * 3600, 'browser may keep it only as long as the cache');
+		$expires = strtotime((string)($response->headers()['Expires'] ?? ''));
+		$this->assertTrue($expires !== false && $expires > time() + 23 * 3600 && $expires <= time() + 24 * 3600 + 5, 'Expires matches, so mod_expires adds no year');
+		$this->assertSame('nosniff', $response->headers()['X-Content-Type-Options'] ?? null, 'nosniff');
+		$this->assertSame(404, $kirby->call('koe/avatar/ffffffffffffffffffffffffffffffff')->code(), 'unknown picture: 404');
+		[, , $off] = $this->render(['sayamaapps.koe.active' => false] + $this->on());
+		$this->assertSame(404, $off->call('koe/avatar/' . basename($with['avatar']))->code(), 'module off: 404');
 	}
 
 	public function testSiteSnippetOverridesThePackageSnippet(): void
@@ -462,5 +425,45 @@ final class KirbyTest extends TestCase
 		file_put_contents($this->tmp . '/site/snippets/koe/reviews.php', '<?php $r = site()->koeReviews(); ?>OWN <?= $r === null ? "off" : count($r["reviews"]) . "/" . $r["limit"] ?>');
 		[, $html] = $this->render($this->on());
 		$this->assertSame('OWN 1/3', trim($html), 'site/snippets/koe/reviews.php must override the package snippet');
+	}
+
+	public function testSwitchedOffByDefaultNothingIsShownOrFetched(): void
+	{
+		[$r, $html, $kirby] = $this->render(['sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
+		$this->assertTrue($kirby->plugin('sayamaapps/koe') !== null, 'plugin sayamaapps/koe registered');
+		$this->assertNull($r, 'without koe.active koeReviews() is null');
+		$this->assertSame('', trim($html), 'without koe.active the snippet prints nothing');
+		$this->assertSame([], $this->queue, 'without koe.active nothing is fetched');
+		$this->assertSame('Read all on Google', $kirby->translation('en')->get('sayamaapps.koe.readAll'), 'strings registered as Kirby translations');
+		$this->assertSame('Alle auf Google lesen', $kirby->translation('de')->get('sayamaapps.koe.readAll'), 'German Kirby translation');
+		$this->assertTrue(function_exists('koe_option'), 'koe_option() helper');
+		[$r] = $this->render(['sayamaapps.koe.active' => 'yes'] + $this->on());
+		$this->assertNull($r, 'sayamaapps.koe.active = "yes" must not switch on');
+		$this->assertSame([], $this->queue, 'sayamaapps.koe.active = "yes": nothing fetched');
+	}
+
+	public function testWithoutPlaceIdOrKeyNothingIsFetchedAndDebugModeSaysWhy(): void
+	{
+		$this->logged();
+		[$r, $html] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.key' => self::KEY, 'debug' => true]);
+		$this->assertTrue($r === null && trim($html) === '' && $this->queue === [], 'no koe.placeId: nothing shown, nothing fetched');
+		$this->assertTrue(str_contains($this->logged(), 'sayamaapps.koe.placeId is not set'), 'no koe.placeId: debug log says so');
+		[$r] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'debug' => true]);
+		$this->assertTrue($r === null && $this->queue === [], 'no key: nothing shown, nothing fetched');
+		$this->assertTrue(str_contains($this->logged(), 'no API key'), 'no key: debug log says so');
+		[$r] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample']);
+		$this->assertSame('', $this->logged(), 'without debug nothing is logged for a missing key');
+	}
+
+	/** Google's answer: the details of ChIJExample (or the raw answer), and the pictures. Records every call. */
+	private function transport(): Closure
+	{
+		return function (string $url, array $headers): array {
+			$this->calls[] = ['url' => $url, 'headers' => $headers];
+			if (str_starts_with($url, Places::ENDPOINT)) {
+				return isset($this->answer['status']) ? $this->answer : ['status' => 200, 'body' => json_encode($this->answer)];
+			}
+			return $this->pictures[$url] ?? ['status' => 404, 'body' => ''];
+		};
 	}
 }
