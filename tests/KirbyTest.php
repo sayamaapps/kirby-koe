@@ -22,6 +22,15 @@ use Sayamaapps\Koe\Plugin;
  * (Plugin::reviews()); the snippet is only rendered on a cache that is
  * already filled, so no request leaves the test.
  *   vendor/bin/phpunit
+ *
+ * One test method per case makes this class large on purpose (31 methods, 17 public).
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
+ * @SuppressWarnings(PHPMD.TooManyMethods)
+ * @SuppressWarnings(PHPMD.TooManyPublicMethods)
+ *
+ * Global classes (RuntimeException, DateTimeImmutable, ...) are used without import: a use
+ * statement for a global name has no effect in PHP, and PHP warns about it.
+ * @SuppressWarnings(PHPMD.MissingImport)
  */
 #[CoversClass(\Sayamaapps\Koe\Plugin::class)]
 final class KirbyTest extends TestCase
@@ -62,8 +71,8 @@ final class KirbyTest extends TestCase
 		if (!is_dir($dir)) {
 			return 0;
 		}
-		$files = iterator_to_array(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)));
-		return count(array_filter($files, fn (SplFileInfo $file) => !str_ends_with($file->getFilename(), '.lock')));
+		$files = iterator_to_array(new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)));
+		return count(array_filter($files, fn (\SplFileInfo $file) => !str_ends_with($file->getFilename(), '.lock')));
 	}
 
 	/** Runs the queued refreshes, as after the response. */

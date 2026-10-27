@@ -9,6 +9,13 @@ use Sayamaapps\Koe\Reviews;
  * Selection rules, approval, links, the profile URL and the notice —
  * without Kirby.
  *   vendor/bin/phpunit
+ *
+ * One test method per case makes this class large on purpose (14 public methods).
+ * @SuppressWarnings(PHPMD.TooManyPublicMethods)
+ *
+ * Global classes (RuntimeException, DateTimeImmutable, ...) are used without import: a use
+ * statement for a global name has no effect in PHP, and PHP warns about it.
+ * @SuppressWarnings(PHPMD.MissingImport)
  */
 #[CoversClass(\Sayamaapps\Koe\Reviews::class)]
 final class ReviewsTest extends TestCase
@@ -195,9 +202,9 @@ final class ReviewsTest extends TestCase
 		$this->assertSame(['Fits'], array_column($out, 'name'), '4 stars / short / old / blank fall out');
 	}
 
-	private function today(): DateTimeImmutable
+	private function today(): \DateTimeImmutable
 	{
-		return new DateTimeImmutable('2026-10-05', new DateTimeZone('Europe/Berlin'));
+		return new \DateTimeImmutable('2026-10-05', new \DateTimeZone('Europe/Berlin'));
 	}
 
 	private function wall(): string

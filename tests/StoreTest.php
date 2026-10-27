@@ -14,6 +14,14 @@ use Sayamaapps\Koe\Store;
  * else), how long, what happens on errors, and that a refresh leaves nothing
  * of the previous one behind. Kirby's FileCache, no Kirby app, no network.
  *   vendor/bin/phpunit
+ *
+ * Each case wires the cache, the transport and the clock itself, so the class
+ * couples to 13 classes on purpose.
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ *
+ * Global classes (RuntimeException, DateTimeImmutable, ...) are used without import: a use
+ * statement for a global name has no effect in PHP, and PHP warns about it.
+ * @SuppressWarnings(PHPMD.MissingImport)
  */
 #[CoversClass(\Sayamaapps\Koe\Store::class)]
 final class StoreTest extends TestCase
@@ -26,7 +34,7 @@ final class StoreTest extends TestCase
 	/** Every request the transport answered. */
 	private array $calls = [];
 	private string $tmp;
-	private DateTimeImmutable $today;
+	private \DateTimeImmutable $today;
 
 	private function details(): array
 	{
@@ -40,7 +48,7 @@ final class StoreTest extends TestCase
 			return [];
 		}
 		$files = [];
-		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)) as $file) {
+		foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)) as $file) {
 			$files[] = substr($file->getPathname(), strlen($dir) + 1);
 		}
 		sort($files);
@@ -70,7 +78,7 @@ final class StoreTest extends TestCase
 	{
 		$this->tmp = sys_get_temp_dir() . '/koe-store-' . bin2hex(random_bytes(6));
 		$this->cache = new FileCache(['root' => $this->tmp, 'prefix' => 'koe', 'extension' => 'cache']);
-		$this->today = new DateTimeImmutable('2026-10-05', new DateTimeZone('Europe/Berlin'));
+		$this->today = new \DateTimeImmutable('2026-10-05', new \DateTimeZone('Europe/Berlin'));
 		$this->calls = [];
 	}
 
@@ -123,7 +131,7 @@ final class StoreTest extends TestCase
 			self::ANNA_PHOTO => ['status' => 200, 'body' => "\x89PNG\r\n\x1A\n" . str_repeat('p', 200)],
 			'https://lh3.googleusercontent.com/a/example2=s128' => ['status' => 200, 'body' => '<html>not an image</html>'],
 			'https://lh3.googleusercontent.com/a/example3=s128' => ['status' => 200, 'body' => "\xFF\xD8\xFF" . str_repeat('x', Store::MAX_AVATAR_BYTES)],
-			'https://lh3.googleusercontent.com/a/example5=s128' => new RuntimeException('timeout'),
+			'https://lh3.googleusercontent.com/a/example5=s128' => new \RuntimeException('timeout'),
 		];
 		$problem = Store::refresh($this->cache, $this->transport($this->details(), $pictures), $key, $settings, $lenient, $this->today);
 		$this->assertNull($problem, 'refresh with broken pictures still succeeds');
@@ -191,7 +199,7 @@ final class StoreTest extends TestCase
 	public function testNetworkErrorIsReportedWithTheKeyScrubbed(): void
 	{
 		$key = self::KEY;
-		$problem = Store::refresh($this->cache, $this->transport(new RuntimeException('Could not resolve host (' . $key . ')')), $key, $this->settings(), Reviews::defaultRules(), $this->today);
+		$problem = Store::refresh($this->cache, $this->transport(new \RuntimeException('Could not resolve host (' . $key . ')')), $key, $this->settings(), Reviews::defaultRules(), $this->today);
 		$this->assertTrue(str_contains((string)$problem, 'not reachable') && !str_contains((string)$problem, $key), 'network error: reported, key scrubbed');
 	}
 
@@ -254,7 +262,7 @@ final class StoreTest extends TestCase
 		$winner = Store::claim($racy);
 		$this->assertSame(1, (int)$winner + (int)$rival, 'two requests at the same moment: exactly one may start the refresh');
 		// The winner's refresh ends the lock; it fails here on purpose (nothing to keep).
-		Store::refresh($racy, $this->transport(new RuntimeException('Could not resolve host (' . $key . ')')), $key, $settings, $rules, $this->today);
+		Store::refresh($racy, $this->transport(new \RuntimeException('Could not resolve host (' . $key . ')')), $key, $settings, $rules, $this->today);
 	}
 
 	/** A Google-like answer: the details (an array = 200 with it, or a Throwable) and the pictures. Records every call. */

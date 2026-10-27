@@ -10,6 +10,10 @@ use PHPUnit\Framework\TestCase;
  * The names of earlier versions still work: the old class names are aliases
  * of the new ones, and koe_option() reads the options and announces itself
  * as deprecated in debug mode.
+ *
+ * Global classes (RuntimeException, DateTimeImmutable, ...) are used without import: a use
+ * statement for a global name has no effect in PHP, and PHP warns about it.
+ * @SuppressWarnings(PHPMD.MissingImport)
  */
 #[CoversNothing]
 final class LegacyTest extends TestCase
@@ -49,7 +53,7 @@ final class LegacyTest extends TestCase
 		require_once dirname(__DIR__) . '/legacy.php';
 
 		foreach (['Fetch', 'I18n', 'Options', 'Places', 'PlacesException', 'Plugin', 'Reviews', 'Store'] as $name) {
-			$class = new ReflectionClass('Koe\\' . $name);
+			$class = new \ReflectionClass('Koe\\' . $name);
 			Assert::assertSame('Sayamaapps\\Koe\\' . $name, $class->getName(), "Koe\\$name is an alias");
 		}
 		Assert::assertSame('Read all on Google', Koe\I18n::t('readAll'), 'the alias works');

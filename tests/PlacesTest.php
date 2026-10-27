@@ -13,6 +13,13 @@ use Sayamaapps\Koe\PlacesException;
  * query, nothing found, quota, API error, transport error). The CLI only
  * shows; it writes nothing. The key must never appear in any output.
  *   vendor/bin/phpunit
+ *
+ * One test method per case makes this class large on purpose (13 public methods).
+ * @SuppressWarnings(PHPMD.TooManyPublicMethods)
+ *
+ * Global classes (RuntimeException, DateTimeImmutable, ...) are used without import: a use
+ * statement for a global name has no effect in PHP, and PHP warns about it.
+ * @SuppressWarnings(PHPMD.MissingImport)
  */
 #[CoversClass(\Sayamaapps\Koe\Fetch::class)]
 #[CoversClass(\Sayamaapps\Koe\Places::class)]
@@ -56,7 +63,7 @@ final class PlacesTest extends TestCase
 		} catch (PlacesException $e) {
 			return $e->getMessage();
 		}
-		throw new RuntimeException('no exception');
+		throw new \RuntimeException('no exception');
 	}
 
 	private function fixture(string $name): string
@@ -103,7 +110,7 @@ final class PlacesTest extends TestCase
 		$this->assertTrue(str_starts_with($quota, 'Places API answered 429 RESOURCE_EXHAUSTED Quota exceeded') && str_contains($quota, 'daily quota'), 'quota: status plus hint');
 		$this->assertSame('Places API answered 502', $this->failure([['status' => 502, 'body' => '<html>Bad Gateway</html>']]), 'non-JSON error body: status only');
 		$this->assertSame('Places API answered 200 with a body that is not JSON.', $this->failure([['status' => 200, 'body' => 'not json']]), '200 without JSON');
-		$this->assertSame('Places API not reachable: Could not resolve host: places.googleapis.com ([key])', $this->failure([new RuntimeException('Could not resolve host: places.googleapis.com (' . self::KEY . ')')]), 'transport failure, key scrubbed');
+		$this->assertSame('Places API not reachable: Could not resolve host: places.googleapis.com ([key])', $this->failure([new \RuntimeException('Could not resolve host: places.googleapis.com (' . self::KEY . ')')]), 'transport failure, key scrubbed');
 	}
 
 	public function testClientSendsSearchAndDetailsRequests(): void
@@ -130,7 +137,7 @@ final class PlacesTest extends TestCase
 				['status' => 200, 'body' => $this->fixture('places-search.json')],
 				['status' => 404, 'body' => json_encode(['error' => ['status' => 'NOT_FOUND', 'message' => 'No such place']])],
 			],
-			'network' => [new RuntimeException('timeout ' . self::KEY)],
+			'network' => [new \RuntimeException('timeout ' . self::KEY)],
 		] as $what => $script) {
 			[$code, $out, $err] = $this->cli($this->env(), $this->transport($script));
 			$errors[$what] = $err;
