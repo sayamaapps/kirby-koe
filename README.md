@@ -111,14 +111,14 @@ The new option keys and class names come with this release. The old names keep w
 | `Koe\*` classes | `Sayamaapps\Koe\*` | Class aliases, loaded with the plugin. |
 | translation keys `koe.<key>` | `sayamaapps.koe.<key>` | Both are registered. |
 
-A site can silence a deprecation with `Kirby\Cms\Helpers::$deprecations['option-prefix'] = false;` (or `'koe-function'`).
+A site can silence a deprecation with `Kirby\Cms\Helpers::$deprecations['option-prefix'] = false;` (or `'koe-function'`). In Kirby's debug mode a deprecation becomes an error page: with `koe.<name>` keys set, every page that calls `koeReviews()` or `koe_option()` fails until the keys are renamed or the deprecation is silenced.
 
 Tests: `composer test` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
 
 
 ## Implementation notes
 
-The Places client (`Sayamaapps\Koe\Places`, with its own transport: curl, or streams without curl) and the translation table (`Sayamaapps\Koe\I18n`) do not use Kirby's `Remote` and `I18n`. The core also runs without Kirby in the `koe-fetch` CLI, and the snippet texts must match what the CLI prints. Everything else follows the Kirby standard: options, translations, site methods, routes and the cache.
+The Places client (`Sayamaapps\Koe\Places`, with its own transport: curl, or streams without curl) and the translation table (`Sayamaapps\Koe\I18n`) do not use Kirby's `Remote` and `I18n`. The Places client throws `Sayamaapps\Koe\PlacesException`, a plain `RuntimeException`, and not one of Kirby's exceptions, because the core also runs without Kirby in the `koe-fetch` CLI. The snippet texts must match what the CLI prints. Everything else follows the Kirby standard: options, translations, site methods, routes and the cache.
 
 ## Privacy
 
@@ -129,4 +129,4 @@ See [PRIVACY.md](PRIVACY.md) (English) and [DATENSCHUTZ.md](DATENSCHUTZ.md) (Ger
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE.md](LICENSE.md).
