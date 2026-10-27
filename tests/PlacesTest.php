@@ -3,7 +3,6 @@
 use Kirby\Filesystem\Dir;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Sayamaapps\Koe\Fetch;
 use Sayamaapps\Koe\Places;
 use Sayamaapps\Koe\PlacesException;

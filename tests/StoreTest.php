@@ -1,15 +1,9 @@
 <?php
 
-use DateTimeImmutable;
-use DateTimeZone;
-use FilesystemIterator;
 use Kirby\Cache\FileCache;
 use Kirby\Filesystem\Dir;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use RuntimeException;
 use Sayamaapps\Koe\Places;
 use Sayamaapps\Koe\Reviews;
 use Sayamaapps\Koe\Store;

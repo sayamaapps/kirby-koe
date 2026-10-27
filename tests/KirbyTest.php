@@ -5,12 +5,9 @@ use Kirby\Filesystem\Dir;
 use Kirby\Template\Snippet;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
 use Sayamaapps\Koe\Options;
 use Sayamaapps\Koe\Places;
 use Sayamaapps\Koe\Plugin;
-use SplFileInfo;
 
 /**
  * The plugin with real Kirby, in a throwaway directory: the switch (off by
