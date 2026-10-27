@@ -12,7 +12,7 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
-## [Unreleased]
+## [2.3.0] — 2026-10-27
 
 Nothing a site has to change. The option keys, the translation keys and the
 old names keep working; the planned changes are listed at the end.
