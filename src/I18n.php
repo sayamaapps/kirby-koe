@@ -6,13 +6,14 @@ namespace Sayamaapps\Koe;
  * Strings of the default snippet, Kirby-free.
  *
  * The tables live in translations/<language>.php and are also registered as
- * Kirby plugin translations under `koe.<key>` (index.php), so site snippets
- * can use t('koe.readAll'). Koe itself reads its own tables: a missing Kirby
+ * Kirby plugin translations under `koe.<key>` (config/translations.php), so
+ * site snippets can use t('koe.readAll'). Koe itself reads its own tables: a missing Kirby
  * translation must never silently turn a German section English.
  *
  * The language is set once per request (index.php, from Options::language())
  * and defaults to English. Missing keys fall back to English, then to the key.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder

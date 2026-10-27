@@ -4,18 +4,17 @@ namespace Sayamaapps\Koe;
 
 use Closure;
 use Kirby\Cms\App;
-use Kirby\Cms\Helpers;
 
 /**
- * Reads the `sayamaapps.koe.*` options.
+ * Reads the `koe.*` options.
  *
  * `null` counts as "not set", like Kirby's own option() (A::get() checks
- * isset() as well), so `'sayamaapps.koe.logo' => null` falls back to the default.
+ * isset() as well), so `'koe.logo' => null` falls back to the default.
  *
- * Two spellings are read: flat (`'sayamaapps.koe.active' => true`) and grouped
- * (`'sayamaapps.koe' => ['active' => true]`). The fully nested form
- * (`'sayamaapps' => ['koe' => [...]]`) is not read once the plugin is registered.
+ * Both spellings work, flat (`'koe.active' => true`) and nested
+ * (`'koe' => ['active' => true]`), because Kirby's option() finds both.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -26,14 +25,11 @@ class Options
 	/** Holding time of the cache in hours: the default, and the longest allowed. */
 	public const CACHE_HOURS = 24;
 
-	/** Where the API key is looked for when `sayamaapps.koe.key` is not set. */
+	/** Where the API key is looked for when `koe.key` is not set. */
 	public const ENV_KEY = 'GOOGLE_PLACES_API_KEY';
 
-	/** The spelling before 2.3: `koe.<key>`, read as a fallback until the next major version. */
-	public const LEGACY_PREFIX = 'koe.';
-
-	/** Prefix of the option keys: `sayamaapps.koe.<key>`. */
-	public const PREFIX = 'sayamaapps.koe.';
+	/** Prefix of the option keys: `koe.<key>`. */
+	public const PREFIX = 'koe.';
 
 	/**
 	 * Logs why nothing is shown, but only in Kirby's debug mode: on a live
@@ -48,21 +44,11 @@ class Options
 
 	public static function get(App $kirby, string $key, mixed $default = null): mixed
 	{
-		$value = $kirby->option(self::PREFIX . $key);
-		if ($value === null) {
-			$value = $kirby->option(self::LEGACY_PREFIX . $key);
-			if ($value !== null) {
-				Helpers::deprecated(
-					'the option ' . self::LEGACY_PREFIX . $key . ' is deprecated, use ' . self::PREFIX . $key,
-					'option-prefix'
-				);
-			}
-		}
-		return $value ?? $default;
+		return $kirby->option(self::PREFIX . $key) ?? $default;
 	}
 
 	/**
-	 * The Places API key: `sayamaapps.koe.key` (a string or a closure returning one),
+	 * The Places API key: `koe.key` (a string or a closure returning one),
 	 * otherwise the environment variable GOOGLE_PLACES_API_KEY — getenv(),
 	 * then the server environment, read through Kirby's environment(), where
 	 * Apache's SetEnv lands under FastCGI. Null when none is set.
@@ -82,7 +68,7 @@ class Options
 	}
 
 	/**
-	 * Language of the snippet text: `sayamaapps.koe.language`, otherwise the site's
+	 * Language of the snippet text: `koe.language`, otherwise the site's
 	 * default language (multi-language sites), otherwise the first two letters
 	 * of Kirby's `locale` option, otherwise English. Only languages Koe ships
 	 * (I18n::LANGUAGES) are returned.
@@ -109,13 +95,13 @@ class Options
 		return 'en';
 	}
 
-	/** `sayamaapps.koe.cacheHours` as minutes: whole hours from 1 to CACHE_HOURS, default CACHE_HOURS. */
+	/** `koe.cacheHours` as minutes: whole hours from 1 to CACHE_HOURS, default CACHE_HOURS. */
 	public static function minutes(App $kirby): int
 	{
 		return 60 * max(1, min(self::CACHE_HOURS, (int)self::get($kirby, 'cacheHours', self::CACHE_HOURS)));
 	}
 
-	/** `sayamaapps.koe.placeId`, trimmed: the place whose reviews are fetched. Null when not configured. */
+	/** `koe.placeId`, trimmed: the place whose reviews are fetched. Null when not configured. */
 	public static function placeId(App $kirby): string|null
 	{
 		$placeId = self::get($kirby, 'placeId');

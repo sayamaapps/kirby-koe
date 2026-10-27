@@ -8,6 +8,7 @@ use Kirby\Cms\App;
  * What the site methods return: the reviews a page shows and the address of
  * the Google profile. config/site-methods.php only delegates here.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -15,7 +16,7 @@ use Kirby\Cms\App;
  */
 class Site
 {
-	/** Address of the Google profile from `sayamaapps.koe.placeId`, or null. */
+	/** Address of the Google profile from `koe.placeId`, or null. */
 	public static function profileUrl(App $kirby): string|null
 	{
 		return Reviews::profileUrl(Options::placeId($kirby));

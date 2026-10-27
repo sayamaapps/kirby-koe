@@ -18,6 +18,7 @@ use Kirby\Http\Response;
  * LiteSpeed; elsewhere that one visitor waits for it). The views after it
  * show the reviews until the cache expires.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -27,6 +28,22 @@ class Plugin
 {
 	/** Kirby's cache for the plugin `sayamaapps/koe` (option `sayamaapps.koe.cache`). */
 	public const CACHE = 'sayamaapps.koe';
+
+	/**
+	 * Runs a job after the response; null = the real way. Pass it to reviews() instead.
+	 *
+	 * @deprecated
+	 * @internal
+	 */
+	public static Closure|null $defer = null;
+
+	/**
+	 * The HTTP transport (see Places); null = the real one. Pass it to refresh() or reviews() instead.
+	 *
+	 * @deprecated
+	 * @internal
+	 */
+	public static Closure|null $transport = null;
 
 	/**
 	 * The route `koe/avatar/<key>`: a cached profile picture, or 404. The
@@ -79,11 +96,12 @@ class Plugin
 	 * Fetches the reviews into the cache. Failures go to the error log (also
 	 * outside debug mode: they need someone to act), the key scrubbed.
 	 *
-	 * @param $transport the HTTP client (see Places); null = the real one
+	 * @param $transport the HTTP client (see Places); null = self::$transport, else the real one
 	 * @return ?string null when done, otherwise what went wrong
 	 */
 	public static function refresh(App $kirby, array $rules, Closure|null $transport = null): string|null
 	{
+		$transport ??= self::$transport;
 		$key = Options::key($kirby);
 		$placeId = $rules['placeId'] ?? null;
 		if ($key === null || $placeId === null) {
@@ -111,15 +129,16 @@ class Plugin
 	 * Rating, count and the selected reviews, or null (= show nothing: no
 	 * place id, no key, nothing cached yet, or a place without rating).
 	 *
-	 * @param $transport passed on to refresh() (null = the real one)
-	 * @param $defer runs the refresh job instead of deferring it after the response (null = the server way)
+	 * @param $transport passed on to refresh() (null = self::$transport, else the real one)
+	 * @param $defer runs the refresh job instead of deferring it after the response (null = self::$defer, else the server way)
 	 * @return array{rating: float, count: int, placeId: string, reviews: array<int, array<string, mixed>>, limit: int}|null
 	 */
 	public static function reviews(App $kirby, array $rules, Closure|null $transport = null, Closure|null $defer = null): array|null
 	{
+		$defer ??= self::$defer;
 		$placeId = $rules['placeId'] ?? null;
 		if ($placeId === null) {
-			Options::debugLog($kirby, 'nothing shown: sayamaapps.koe.placeId is not set (koe-fetch shows the id)');
+			Options::debugLog($kirby, 'nothing shown: koe.placeId is not set (koe-fetch shows the id)');
 			return null;
 		}
 		$cache = $kirby->cache(self::CACHE);
@@ -128,7 +147,7 @@ class Plugin
 			// The page without reviews must not stay in Kirby's page cache.
 			$kirby->response()->cache(false);
 			if (Options::key($kirby) === null) {
-				Options::debugLog($kirby, 'nothing shown: no API key (sayamaapps.koe.key or ' . Options::ENV_KEY . ')');
+				Options::debugLog($kirby, 'nothing shown: no API key (koe.key or ' . Options::ENV_KEY . ')');
 				return null;
 			}
 			if (Store::claim($cache)) {

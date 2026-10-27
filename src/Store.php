@@ -25,6 +25,7 @@ use Kirby\Cache\FileCache;
  * a review that is gone included). Kirby removes an expired entry when it is
  * read, which happens on the next page view.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -217,7 +218,7 @@ class Store
 		// The place the details are about must be the configured one.
 		$answered = trim((string)($details['id'] ?? ''));
 		if ($answered !== '' && $answered !== $placeId) {
-			return self::fail($cache, 'Google answered for place ' . $answered . ', but sayamaapps.koe.placeId is ' . $placeId
+			return self::fail($cache, 'Google answered for place ' . $answered . ', but koe.placeId is ' . $placeId
 				. ' — the listing may have been recreated; check the id with koe-fetch');
 		}
 

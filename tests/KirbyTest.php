@@ -120,7 +120,7 @@ final class KirbyTest extends TestCase
 	/** The options that switch the module on for the place, with the key. */
 	private function on(): array
 	{
-		return ['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY];
+		return ['koe.active' => true, 'koe.placeId' => 'ChIJExample', 'koe.key' => self::KEY];
 	}
 
 	/** Puts the refresh into the queue instead of running it after the response. */
@@ -229,16 +229,16 @@ final class KirbyTest extends TestCase
 
 	public function testApprovedListTileTitleAndLogo(): void
 	{
-		$approved = ['sayamaapps.koe.approved' => ['id-without']] + $this->on();
+		$approved = ['koe.approved' => ['id-without']] + $this->on();
 		$this->fill($approved);
 		[$r, $html] = $this->render($approved, ['title' => 'What our customers say', 'logo' => 'assets/GoogleMaps_Logo_Gray.svg']);
 		$this->assertSame(['Without Link'], array_column($r['reviews'], 'name'), 'approved list');
 		$this->assertTrue(str_contains($html, 'Read all on Google') && str_contains($html, '<p>201 reviews</p>'), 'tile with count below three reviews');
 		$this->assertTrue(str_contains($html, '>What our customers say</h2>'), 'title from snippet data');
 		$this->assertTrue((bool)preg_match('~<img class="koe-logo" src="[^"]*/assets/GoogleMaps_Logo_Gray\.svg"[^>]*alt="Google Maps">~', $html), 'logo with alt text');
-		[, $html] = $this->render($approved + ['sayamaapps.koe.title' => 'Voices', 'sayamaapps.koe.logo' => 'assets/logo.svg']);
+		[, $html] = $this->render($approved + ['koe.title' => 'Voices', 'koe.logo' => 'assets/logo.svg']);
 		$this->assertTrue(str_contains($html, '>Voices</h2>') && str_contains($html, '/assets/logo.svg"'), 'title and logo from options');
-		[, $html] = $this->render($approved + ['sayamaapps.koe.logo' => 'assets/logo.svg'], ['logo' => null]);
+		[, $html] = $this->render($approved + ['koe.logo' => 'assets/logo.svg'], ['logo' => null]);
 		$this->assertTrue(str_contains($html, '/assets/logo.svg"'), 'snippet data null falls back to the option');
 	}
 
@@ -274,20 +274,20 @@ final class KirbyTest extends TestCase
 	{
 		$this->fill($this->on());
 		$this->queue = [];
-		[$r] = $this->firstView(['sayamaapps.koe.minRating' => 4] + $this->on());
+		[$r] = $this->firstView(['koe.minRating' => 4] + $this->on());
 		$this->assertTrue($r === null && count($this->queue) === 1, 'other rules than cached: nothing shown, refresh queued');
 		$this->drain();
-		[$r] = $this->render(['sayamaapps.koe.minRating' => 4] + $this->on());
+		[$r] = $this->render(['koe.minRating' => 4] + $this->on());
 		$this->assertSame(['Four Stars', 'With Link', 'Without Link'], array_column($r['reviews'], 'name'), 'refreshed for the new rules');
 		$this->queue = [];
-		[$r] = $this->firstView(['sayamaapps.koe.placeId' => 'ChIJOther'] + $this->on());
+		[$r] = $this->firstView(['koe.placeId' => 'ChIJOther'] + $this->on());
 		$this->assertTrue($r === null && count($this->queue) === 1, 'other place than cached: nothing shown, refresh queued');
 	}
 
 	public function testDebugModeRendersTheDefaultSnippetWithoutDeprecation(): void
 	{
-		// The title and logo come from the new option names: koe_option() would raise a deprecation here.
-		$options = ['debug' => true, 'sayamaapps.koe.title' => 'Voices', 'sayamaapps.koe.logo' => 'assets/logo.svg'] + $this->on();
+		// The title and logo come from the option names; the default snippet must stay silent in debug mode.
+		$options = ['debug' => true, 'koe.title' => 'Voices', 'koe.logo' => 'assets/logo.svg'] + $this->on();
 		$this->fill($options);
 		$deprecations = [];
 		set_error_handler(function (int $level, string $message) use (&$deprecations): bool {
@@ -308,7 +308,7 @@ final class KirbyTest extends TestCase
 
 	public function testEmptyApprovalAndNestedSpelling(): void
 	{
-		$none = ['sayamaapps.koe.approved' => []] + $this->on();
+		$none = ['koe.approved' => []] + $this->on();
 		$this->fill($none);
 		[$r, $html] = $this->render($none);
 		$this->assertSame([], $r['reviews'], 'approved []: no single review');
@@ -359,35 +359,35 @@ final class KirbyTest extends TestCase
 		[, $html] = $this->render(['locale' => 'de_DE.UTF-8'] + $this->on());
 		$this->assertTrue(str_contains($html, '<strong>4,8 von 5</strong>') && str_contains($html, '201 Bewertungen auf Google Maps') && str_contains($html, 'Profil ansehen') && str_contains($html, '(öffnet neuen Tab)'), 'German via locale');
 		$this->assertTrue(str_contains($html, '>Bewertungen auf Google</h2>'), 'German default title');
-		$this->fill(['locale' => 'de_DE', 'sayamaapps.koe.language' => 'en'] + $this->on());
-		[, $html] = $this->render(['locale' => 'de_DE', 'sayamaapps.koe.language' => 'en'] + $this->on());
-		$this->assertTrue(str_contains($html, '4.8 out of 5'), 'sayamaapps.koe.language wins over locale');
+		$this->fill(['locale' => 'de_DE', 'koe.language' => 'en'] + $this->on());
+		[, $html] = $this->render(['locale' => 'de_DE', 'koe.language' => 'en'] + $this->on());
+		$this->assertTrue(str_contains($html, '4.8 out of 5'), 'koe.language wins over locale');
 	}
 
 	public function testHoldingTimeFromCacheHours(): void
 	{
 		foreach ([[2, 2], [0, 1], [48, 24], ['6', 6]] as [$hours, $expected]) {
-			$this->fill(['sayamaapps.koe.cacheHours' => $hours] + $this->on());
-			[, , $kirby] = $this->render(['sayamaapps.koe.cacheHours' => $hours] + $this->on());
+			$this->fill(['koe.cacheHours' => $hours] + $this->on());
+			[, , $kirby] = $this->render(['koe.cacheHours' => $hours] + $this->on());
 			$left = $kirby->response()->expires() - time();
-			$this->assertTrue($left > ($expected * 3600 - 120) && $left <= $expected * 3600, "sayamaapps.koe.cacheHours $hours → $expected h");
+			$this->assertTrue($left > ($expected * 3600 - 120) && $left <= $expected * 3600, "koe.cacheHours $hours → $expected h");
 		}
 	}
 
 	public function testKeyComesFromTheEnvironmentOrAClosure(): void
 	{
 		$_SERVER['GOOGLE_PLACES_API_KEY'] = 'AIza-from-server';
-		$this->fill(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample']);
+		$this->fill(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
 		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-from-server', $this->calls[0]['headers'] ?? [], true), 'key from $_SERVER');
 		unset($_SERVER['GOOGLE_PLACES_API_KEY']);
 		putenv('GOOGLE_PLACES_API_KEY=AIza-from-env');
 		$this->calls = [];
-		$this->fill(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample']);
+		$this->fill(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
 		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-from-env', $this->calls[0]['headers'] ?? [], true), 'key from getenv()');
 		putenv('GOOGLE_PLACES_API_KEY');
 		$this->calls = [];
-		$this->fill(['sayamaapps.koe.key' => fn () => 'AIza-from-closure'] + $this->on());
-		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-from-closure', $this->calls[0]['headers'] ?? [], true), 'sayamaapps.koe.key as closure');
+		$this->fill(['koe.key' => fn () => 'AIza-from-closure'] + $this->on());
+		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-from-closure', $this->calls[0]['headers'] ?? [], true), 'koe.key as closure');
 	}
 
 	public function testNoticeIsWordedFromTheOptions(): void
@@ -400,7 +400,7 @@ final class KirbyTest extends TestCase
 		$this->assertSame($defaultEn, $noticeOf($html), 'default snippet: notice for the default options');
 		$this->assertSame($defaultEn, $r['notice'], 'koeReviews() hands the notice to own snippets as well');
 		$this->assertTrue(strpos($html, 'koe-notice') > strpos($html, '</ul>'), 'the notice stands below the reviews');
-		$strict = ['sayamaapps.koe.minRating' => 4, 'sayamaapps.koe.minLength' => 120, 'sayamaapps.koe.maxAgeMonths' => 12, 'sayamaapps.koe.maxCount' => 2] + $this->on();
+		$strict = ['koe.minRating' => 4, 'koe.minLength' => 120, 'koe.maxAgeMonths' => 12, 'koe.maxCount' => 2] + $this->on();
 		$this->fill($strict);
 		[, $html] = $this->render($strict);
 		$this->assertSame('Selection: 4+ stars, 120+ characters, at most 12 months old, newest first.', $noticeOf($html), 'notice follows the options');
@@ -419,7 +419,7 @@ final class KirbyTest extends TestCase
 		$this->assertTrue($expires !== false && $expires > time() + 23 * 3600 && $expires <= time() + 24 * 3600 + 5, 'Expires matches, so mod_expires adds no year');
 		$this->assertSame('nosniff', $response->headers()['X-Content-Type-Options'] ?? null, 'nosniff');
 		$this->assertSame(404, $kirby->call('koe/avatar/ffffffffffffffffffffffffffffffff')->code(), 'unknown picture: 404');
-		[, , $off] = $this->render(['sayamaapps.koe.active' => false] + $this->on());
+		[, , $off] = $this->render(['koe.active' => false] + $this->on());
 		$this->assertSame(404, $off->call('koe/avatar/' . basename($with['avatar']))->code(), 'module off: 404');
 	}
 
@@ -435,29 +435,29 @@ final class KirbyTest extends TestCase
 
 	public function testSwitchedOffByDefaultNothingIsShownOrFetched(): void
 	{
-		[$r, $html, $kirby] = $this->render(['sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
+		[$r, $html, $kirby] = $this->render(['koe.placeId' => 'ChIJExample', 'koe.key' => self::KEY]);
 		$this->assertTrue($kirby->plugin('sayamaapps/koe') !== null, 'plugin sayamaapps/koe registered');
 		$this->assertNull($r, 'without koe.active koeReviews() is null');
 		$this->assertSame('', trim($html), 'without koe.active the snippet prints nothing');
 		$this->assertSame([], $this->queue, 'without koe.active nothing is fetched');
-		$this->assertSame('Read all on Google', $kirby->translation('en')->get('sayamaapps.koe.readAll'), 'strings registered as Kirby translations');
-		$this->assertSame('Alle auf Google lesen', $kirby->translation('de')->get('sayamaapps.koe.readAll'), 'German Kirby translation');
+		$this->assertSame('Read all on Google', $kirby->translation('en')->get('koe.readAll'), 'strings registered as Kirby translations');
+		$this->assertSame('Alle auf Google lesen', $kirby->translation('de')->get('koe.readAll'), 'German Kirby translation');
 		$this->assertTrue(function_exists('koe_option'), 'koe_option() helper');
-		[$r] = $this->render(['sayamaapps.koe.active' => 'yes'] + $this->on());
-		$this->assertNull($r, 'sayamaapps.koe.active = "yes" must not switch on');
-		$this->assertSame([], $this->queue, 'sayamaapps.koe.active = "yes": nothing fetched');
+		[$r] = $this->render(['koe.active' => 'yes'] + $this->on());
+		$this->assertNull($r, 'koe.active = "yes" must not switch on');
+		$this->assertSame([], $this->queue, 'koe.active = "yes": nothing fetched');
 	}
 
 	public function testWithoutPlaceIdOrKeyNothingIsFetchedAndDebugModeSaysWhy(): void
 	{
 		$this->logged();
-		[$r, $html] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.key' => self::KEY, 'debug' => true]);
+		[$r, $html] = $this->render(['koe.active' => true, 'koe.key' => self::KEY, 'debug' => true]);
 		$this->assertTrue($r === null && trim($html) === '' && $this->queue === [], 'no koe.placeId: nothing shown, nothing fetched');
-		$this->assertTrue(str_contains($this->logged(), 'sayamaapps.koe.placeId is not set'), 'no koe.placeId: debug log says so');
-		[$r] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'debug' => true]);
+		$this->assertTrue(str_contains($this->logged(), 'koe.placeId is not set'), 'no koe.placeId: debug log says so');
+		[$r] = $this->render(['koe.active' => true, 'koe.placeId' => 'ChIJExample', 'debug' => true]);
 		$this->assertTrue($r === null && $this->queue === [], 'no key: nothing shown, nothing fetched');
 		$this->assertTrue(str_contains($this->logged(), 'no API key'), 'no key: debug log says so');
-		[$r] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample']);
+		[$r] = $this->render(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
 		$this->assertSame('', $this->logged(), 'without debug nothing is logged for a missing key');
 	}
 

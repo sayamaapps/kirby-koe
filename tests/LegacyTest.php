@@ -8,8 +8,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * The names of earlier versions still work: the old class names are aliases
- * of the new ones, and koe_option() reads the options and announces itself
- * as deprecated in debug mode.
+ * of the new ones, and koe_option() reads the options without any notice,
+ * also in debug mode.
  *
  * Global classes (RuntimeException, DateTimeImmutable, ...) are used without import: a use
  * statement for a global name has no effect in PHP, and PHP warns about it.
@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversNothing]
 final class LegacyTest extends TestCase
 {
-	public function testKoeOptionReadsAndIsDeprecated(): void
+	public function testKoeOptionReadsWithoutNotice(): void
 	{
 		require_once dirname(__DIR__) . '/legacy.php';
 
@@ -36,11 +36,10 @@ final class LegacyTest extends TestCase
 			return false;
 		}, E_USER_DEPRECATED);
 		try {
-			new App(['roots' => $roots, 'options' => ['url' => 'http://example.invalid', 'debug' => true, 'sayamaapps.koe.logo' => 'new.png']]);
-			Assert::assertSame('new.png', koe_option('logo'), 'koe_option() reads the new spelling');
+			new App(['roots' => $roots, 'options' => ['url' => 'http://example.invalid', 'debug' => true, 'koe.logo' => 'new.png']]);
+			Assert::assertSame('new.png', koe_option('logo'), 'koe_option() reads the option');
 			Assert::assertSame('fallback', koe_option('title', 'fallback'), 'the default applies');
-			Assert::assertCount(2, $seen, 'announced once per call');
-			Assert::assertStringContainsString('koe_option() is deprecated', $seen[0]);
+			Assert::assertSame([], $seen, 'no notice, not even in debug mode');
 		} finally {
 			restore_error_handler();
 			App::destroy();

@@ -8,8 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Sayamaapps\Koe\Options;
 
 /**
- * Options are read as `sayamaapps.koe.<key>`, with the older `koe.<key>` as a
- * fallback. The fallback is announced as a deprecation in debug mode only.
+ * Options are read as `koe.<key>`. Nothing else is read: a key with another
+ * prefix is ignored, and reading an option raises no notice in debug mode.
  */
 #[CoversClass(Options::class)]
 final class OptionsTest extends TestCase
@@ -45,9 +45,9 @@ final class OptionsTest extends TestCase
 		return [$result, $seen];
 	}
 
-	public function testNewSpellingIsReadAndDefaultsApply(): void
+	public function testKoeOptionIsReadAndDefaultsApply(): void
 	{
-		[$kirby, $tmp] = $this->app(['sayamaapps.koe.placeId' => 'ChIJNew']);
+		[$kirby, $tmp] = $this->app(['koe.placeId' => 'ChIJNew']);
 		try {
 			Assert::assertSame('ChIJNew', Options::placeId($kirby));
 			Assert::assertSame(3, Options::get($kirby, 'minRating', 3), 'a missing option gives the default at the read');
@@ -58,40 +58,25 @@ final class OptionsTest extends TestCase
 		}
 	}
 
-	public function testNewSpellingWinsOverTheOlderOne(): void
+	public function testOtherPrefixIsNotRead(): void
 	{
-		[$kirby, $tmp] = $this->app(['sayamaapps.koe.placeId' => 'new', 'koe.placeId' => 'old', 'debug' => true]);
+		[$kirby, $tmp] = $this->app(['sayamaapps.koe.placeId' => 'ChIJOther', 'debug' => true]);
 		try {
 			[$placeId, $deprecations] = $this->collectDeprecations(fn () => Options::placeId($kirby));
-			Assert::assertSame('new', $placeId);
-			Assert::assertSame([], $deprecations, 'the fallback is not used, so nothing is announced');
+			Assert::assertNull($placeId, 'the next major version reads sayamaapps.koe.*, not this one');
+			Assert::assertSame([], $deprecations, 'no notice in debug mode');
 		} finally {
 			App::destroy();
 			Dir::remove($tmp);
 		}
 	}
 
-	public function testOlderSpellingIsReadAndAnnouncedInDebugMode(): void
+	public function testReadingRaisesNoNoticeInDebugMode(): void
 	{
-		[$kirby, $tmp] = $this->app(['koe.placeId' => 'old', 'debug' => true]);
+		[$kirby, $tmp] = $this->app(['koe.placeId' => 'ChIJOld', 'debug' => true]);
 		try {
 			[$placeId, $deprecations] = $this->collectDeprecations(fn () => Options::placeId($kirby));
-			Assert::assertSame('old', $placeId);
-			Assert::assertCount(1, $deprecations);
-			Assert::assertStringContainsString('koe.placeId', $deprecations[0]);
-			Assert::assertStringContainsString('sayamaapps.koe.placeId', $deprecations[0]);
-		} finally {
-			App::destroy();
-			Dir::remove($tmp);
-		}
-	}
-
-	public function testOlderSpellingIsSilentOutsideDebugMode(): void
-	{
-		[$kirby, $tmp] = $this->app(['koe.placeId' => 'old']);
-		try {
-			[$placeId, $deprecations] = $this->collectDeprecations(fn () => Options::placeId($kirby));
-			Assert::assertSame('old', $placeId);
+			Assert::assertSame('ChIJOld', $placeId);
 			Assert::assertSame([], $deprecations);
 		} finally {
 			App::destroy();

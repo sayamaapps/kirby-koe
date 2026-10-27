@@ -1,21 +1,7 @@
 <?php
 
-// Options Koe reads, relative to the plugin: `sayamaapps.koe.<key>`. Each value
-// is null on purpose: Options::get() gives the default at every read, and a
-// default here would hide the older spelling `koe.<key>` (fallback).
+// Kirby's plugin options: the plugin cache (`sayamaapps.koe.cache`). The Koe
+// options themselves (`koe.<key>`) are read by Options and need no declaration.
 return [
-	'cache'        => true,
-	'active'       => null,
-	'placeId'      => null,
-	'key'          => null,
-	'cacheHours'   => null,
-	'minRating'    => null,
-	'minLength'    => null,
-	'maxAgeMonths' => null,
-	'maxCount'     => null,
-	'truncate'     => null,
-	'approved'     => null,
-	'title'        => null,
-	'logo'         => null,
-	'language'     => null,
+	'cache' => true,
 ];

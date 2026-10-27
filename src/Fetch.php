@@ -7,7 +7,7 @@ use Closure;
 /**
  * The lookup behind bin/koe-fetch: settings from the environment (or
  * arguments), one text search, one details call, then a report — the place
- * id (for `sayamaapps.koe.placeId`) and every review with its id (for `sayamaapps.koe.approved`).
+ * id (for `koe.placeId`) and every review with its id (for `koe.approved`).
  * It writes nothing: the site fetches on its own, when a visitor needs the
  * reviews (Store).
  *
@@ -18,6 +18,7 @@ use Closure;
  *
  * The key is never printed. Google's error messages are scrubbed of it too.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -93,7 +94,7 @@ class Fetch
 		if ($data['reviews'] === []) {
 			fwrite($out, "Google returned no usable reviews; that is the current state.\n");
 		}
-		fwrite($out, 'Nothing is written: the site fetches the reviews itself (sayamaapps.koe.placeId ' . $placeId . ").\n");
+		fwrite($out, 'Nothing is written: the site fetches the reviews itself (koe.placeId ' . $placeId . ").\n");
 		return self::EXIT_OK;
 	}
 
@@ -102,8 +103,8 @@ class Fetch
 		return <<<TXT
         Usage: koe-fetch [--query="Name, Street 1, 12345 Town"] [--language=en]
 
-        Shows the place id (for sayamaapps.koe.placeId) and the reviews Google returns now,
-        with their ids (for sayamaapps.koe.approved). It writes nothing; the site fetches
+        Shows the place id (for koe.placeId) and the reviews Google returns now,
+        with their ids (for koe.approved). It writes nothing; the site fetches
         the reviews itself.
         Environment: GOOGLE_PLACES_API_KEY (required; missing = exit 3), KOE_QUERY,
         KOE_LANGUAGE.

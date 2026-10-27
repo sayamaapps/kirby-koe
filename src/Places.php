@@ -17,6 +17,7 @@ use RuntimeException;
  * Errors are PlacesException with a message that never contains the request
  * or the key: only Google's status and message, or the transport failure.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -90,11 +91,9 @@ class Places
 		$response = curl_exec($ch);
 		if ($response === false) {
 			$error = curl_error($ch);
-			curl_close($ch);
 			throw new RuntimeException($error);
 		}
 		$status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-		curl_close($ch);
 		return ['status' => $status, 'body' => (string)$response];
 	}
 
@@ -199,7 +198,7 @@ class Places
 		return [$entry, $message];
 	}
 
-	/** `name` is "places/<place>/reviews/<id>"; the id is what sayamaapps.koe.approved lists. Null when empty. */
+	/** `name` is "places/<place>/reviews/<id>"; the id is what koe.approved lists. Null when empty. */
 	private static function reviewId(string $name): string|null
 	{
 		$slash = strrpos($name, '/');

@@ -23,7 +23,6 @@
         "CURLOPT_POSTFIELDS",
         "CURLOPT_RETURNTRANSFER",
         "CURLOPT_TIMEOUT",
-        "curl_close",
         "curl_error",
         "curl_exec",
         "curl_getinfo",
