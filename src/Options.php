@@ -64,8 +64,8 @@ class Options
 	/**
 	 * The Places API key: `sayamaapps.koe.key` (a string or a closure returning one),
 	 * otherwise the environment variable GOOGLE_PLACES_API_KEY — getenv(),
-	 * then $_SERVER, where Apache's SetEnv lands under FastCGI. Null when
-	 * none is set.
+	 * then the server environment, read through Kirby's environment(), where
+	 * Apache's SetEnv lands under FastCGI. Null when none is set.
 	 */
 	public static function key(App $kirby): string|null
 	{
@@ -73,7 +73,7 @@ class Options
 		if ($key instanceof Closure) {
 			$key = $key();
 		}
-		foreach ([$key, getenv(self::ENV_KEY), $_SERVER[self::ENV_KEY] ?? null] as $candidate) {
+		foreach ([$key, getenv(self::ENV_KEY), $kirby->environment()->get(self::ENV_KEY)] as $candidate) {
 			if (is_string($candidate) && trim($candidate) !== '') {
 				return trim($candidate);
 			}
