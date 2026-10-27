@@ -31,8 +31,8 @@ if ($r === null) {
 }
 $t = fn (string $key, array $values = []) => \Sayamaapps\Koe\I18n::t($key, $values);
 $profile = $r['profileUrl'];
-$title ??= koe_option('title') ?? $t('title');
-$logo ??= koe_option('logo');
+$title ??= \Sayamaapps\Koe\Options::get(kirby(), 'title') ?? $t('title');
+$logo ??= \Sayamaapps\Koe\Options::get(kirby(), 'logo');
 $tab = '<span class="sr-only"> ' . esc($t('opensNewTab')) . '</span>';
 ?>
 <section class="koe" id="koe" aria-labelledby="koe-title">
