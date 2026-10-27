@@ -18,6 +18,7 @@ use Kirby\Http\Response;
  * LiteSpeed; elsewhere that one visitor waits for it). The views after it
  * show the reviews until the cache expires.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder

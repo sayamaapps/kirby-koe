@@ -17,6 +17,7 @@ use RuntimeException;
  * Errors are PlacesException with a message that never contains the request
  * or the key: only Google's status and message, or the transport failure.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder

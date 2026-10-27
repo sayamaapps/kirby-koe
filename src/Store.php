@@ -25,6 +25,7 @@ use Kirby\Cache\FileCache;
  * a review that is gone included). Kirby removes an expired entry when it is
  * read, which happens on the next page view.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -45,7 +46,7 @@ class Store
 	private const VERSION = 1;
 
 	/** Lock of the refresh this process runs; held from claim() until refresh() has ended. */
-	private static $lock = null;
+	private static mixed $lock = null;
 
 	/**
 	 * A cached profile picture, or null.

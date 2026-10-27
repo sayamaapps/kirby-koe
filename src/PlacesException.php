@@ -2,10 +2,10 @@
 
 namespace Sayamaapps\Koe;
 
-/** A failed Places API step. The message is safe to print: it never contains the key. */
 /**
- * Koe class.
+ * A failed Places API step. The message is safe to print: it never contains the key.
  *
+ * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
