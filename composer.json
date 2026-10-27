@@ -1,8 +1,8 @@
 {
     "name": "sayamaapps/kirby-koe",
     "description": "Google reviews for Kirby CMS, cached on your server; visitors' browsers never contact Google.",
-    "type": "kirby-plugin",
     "license": "MIT",
+    "type": "kirby-plugin",
     "keywords": [
         "kirby",
         "kirby-plugin",
@@ -12,13 +12,13 @@
         "places-api",
         "privacy"
     ],
-    "homepage": "https://github.com/sayamaapps/kirby-koe",
     "authors": [
         {
             "name": "Simon Räder",
             "homepage": "https://sayamaapps.de"
         }
     ],
+    "homepage": "https://github.com/sayamaapps/kirby-koe",
     "support": {
         "issues": "https://github.com/sayamaapps/kirby-koe/issues",
         "source": "https://github.com/sayamaapps/kirby-koe"
@@ -29,6 +29,7 @@
         "getkirby/composer-installer": "^1.2"
     },
     "require-dev": {
+        "ergebnis/composer-normalize": "2.54.0",
         "getkirby/cms": "^5.0",
         "icanhazstring/composer-unused": "0.9.7",
         "maglnet/composer-require-checker": "4.17.0",
@@ -36,18 +37,15 @@
         "phpunit/phpunit": "11.5.55",
         "vimeo/psalm": "6.20.1"
     },
+    "suggest": {
+        "ext-curl": "Faster Places API requests; without it the streams wrapper is used."
+    },
     "bin": [
         "bin/koe-fetch"
     ],
-    "scripts": {
-        "analyze:phpmd": "vendor/bin/phpmd src,index.php,legacy.php,autoload.php,config github phpmd.xml.dist",
-        "analyze:psalm": "vendor/bin/psalm",
-        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=composer-require-checker.json composer.json",
-        "analyze:unused": "vendor/bin/composer-unused",
-        "test": "vendor/bin/phpunit"
-    },
     "config": {
         "allow-plugins": {
+            "ergebnis/composer-normalize": true,
             "getkirby/composer-installer": true
         },
         "optimize-autoloader": true,
@@ -58,12 +56,16 @@
     },
     "extra": {
         "installer-name": "koe",
-        "kirby-cms-path": false,
         "kirby": {
             "compatible": "^5.0"
-        }
+        },
+        "kirby-cms-path": false
     },
-    "suggest": {
-        "ext-curl": "Faster Places API requests; without it the streams wrapper is used."
+    "scripts": {
+        "analyze:phpmd": "vendor/bin/phpmd src,index.php,legacy.php,autoload.php,config,tests github phpmd.xml.dist",
+        "analyze:psalm": "vendor/bin/psalm",
+        "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=composer-require-checker.json composer.json",
+        "analyze:unused": "vendor/bin/composer-unused",
+        "test": "vendor/bin/phpunit"
     }
 }

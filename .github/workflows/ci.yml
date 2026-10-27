@@ -65,11 +65,17 @@ jobs:
       - name: Composer validate
         run: composer validate --strict --no-check-version --no-check-all
 
+      - name: Composer normalize
+        run: composer normalize --dry-run --no-interaction
+
       - name: Undeclared dependencies
         run: composer analyze:require-checker
 
       - name: Unused dependencies
         run: composer analyze:unused
+
+      - name: Platform requirements
+        run: composer check-platform-reqs
 
       - name: Psalm
         run: composer analyze:psalm
