@@ -66,6 +66,16 @@
         "analyze:psalm": "vendor/bin/psalm",
         "analyze:require-checker": "vendor/bin/composer-require-checker check --config-file=composer-require-checker.json composer.json",
         "analyze:unused": "vendor/bin/composer-unused",
+        "ci": [
+            "@composer validate --strict --no-check-version --no-check-all",
+            "@composer normalize --dry-run --no-interaction",
+            "@composer check-platform-reqs",
+            "@analyze:require-checker",
+            "@analyze:unused",
+            "@analyze:psalm",
+            "@analyze:phpmd",
+            "@test"
+        ],
         "test": "vendor/bin/phpunit"
     }
 }

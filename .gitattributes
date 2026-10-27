@@ -10,6 +10,7 @@
 /CHANGELOG.md               export-ignore
 /CLAUDE.md                  export-ignore
 /composer-require-checker.json export-ignore
+/composer.lock         export-ignore
 /composer-unused.php        export-ignore
 /docs                       export-ignore
 /phpmd.xml.dist             export-ignore
