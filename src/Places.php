@@ -50,12 +50,7 @@ class Places
 		$status = (int)($answer['status'] ?? 0);
 		$decoded = json_decode((string)($answer['body'] ?? ''), true);
 		if ($status !== 200) {
-			$error = is_array($decoded) && is_array($decoded['error'] ?? null) ? $decoded['error'] : [];
-			$detail = trim((string)($error['status'] ?? '') . ' ' . (string)($error['message'] ?? ''));
-			$hint = $status === 429 || ($error['status'] ?? '') === 'RESOURCE_EXHAUSTED'
-				? ' — the daily quota of the Google Cloud project is used up.'
-				: '';
-			throw new PlacesException('Places API answered ' . $status . ($detail !== '' ? ' ' . self::scrub($detail, $this->key) : '') . $hint);
+			throw $this->apiError($status, $decoded);
 		}
 		if (!is_array($decoded)) {
 			throw new PlacesException('Places API answered 200 with a body that is not JSON.');
@@ -63,69 +58,87 @@ class Places
 		return $decoded;
 	}
 
+	/** Google's status and message for an answer other than 200, the key scrubbed. */
+	private function apiError(int $status, mixed $decoded): PlacesException
+	{
+		$error = is_array($decoded) && is_array($decoded['error'] ?? null) ? $decoded['error'] : [];
+		$detail = trim((string)($error['status'] ?? '') . ' ' . (string)($error['message'] ?? ''));
+		$hint = $status === 429 || ($error['status'] ?? '') === 'RESOURCE_EXHAUSTED'
+			? ' — the daily quota of the Google Cloud project is used up.'
+			: '';
+		return new PlacesException('Places API answered ' . $status . ($detail !== '' ? ' ' . self::scrub($detail, $this->key) : '') . $hint);
+	}
+
 	/** ext-curl when available, otherwise the HTTP stream wrapper. */
 	public static function defaultTransport(int $timeout = 30): Closure
 	{
 		return function (string $url, array $headers, string|null $body) use ($timeout): array {
-			if (function_exists('curl_init')) {
-				$ch = curl_init($url);
-				if ($ch === false) {
-					throw new RuntimeException('curl could not start');
-				}
-				$options = [
-					CURLOPT_RETURNTRANSFER => true,
-					CURLOPT_HTTPHEADER => $headers,
-					CURLOPT_TIMEOUT => $timeout,
-				];
-				if ($body === null) {
-					// Never set CURLOPT_POSTFIELDS for a GET: libcurl switches the
-					// method to POST as soon as the option is set, even to an empty
-					// string — Google then answers 404 for places/{id} (seen 10.10.2026).
-					$options[CURLOPT_HTTPGET] = true;
-				} else {
-					$options[CURLOPT_POST] = true;
-					$options[CURLOPT_POSTFIELDS] = $body;
-				}
-				curl_setopt_array($ch, $options);
-				$response = curl_exec($ch);
-				if ($response === false) {
-					$error = curl_error($ch);
-					curl_close($ch);
-					throw new RuntimeException($error);
-				}
-				$status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-				curl_close($ch);
-				return ['status' => $status, 'body' => (string)$response];
-			}
-			$context = stream_context_create(['http' => [
-				'method' => $body === null ? 'GET' : 'POST',
-				'header' => implode("\r\n", $headers),
-				'content' => $body ?? '',
-				'timeout' => $timeout,
-				'ignore_errors' => true,
-			]]);
-			// Warnings are collected instead of silenced: the first one says why the request failed.
-			$warnings = [];
-			set_error_handler(static function (int $level, string $message) use (&$warnings): bool {
-				$warnings[] = [$level, $message];
-				return true;
-			});
-			try {
-				$response = file_get_contents($url, false, $context);
-			} finally {
-				restore_error_handler();
-			}
-			if ($response === false) {
-				throw new RuntimeException($warnings === [] ? 'request failed' : $warnings[0][1]);
-			}
-			$status = 0;
-			foreach ($http_response_header ?? [] as $line) {
-				if (preg_match('~^HTTP/\S+\s+(\d{3})~', $line, $m)) {
-					$status = (int)$m[1];
-				}
-			}
-			return ['status' => $status, 'body' => $response];
+			return function_exists('curl_init')
+				? self::curlAnswer($url, $headers, $body, $timeout)
+				: self::streamAnswer($url, $headers, $body, $timeout);
 		};
+	}
+
+	/** @return array{status: int, body: string} */
+	private static function curlAnswer(string $url, array $headers, string|null $body, int $timeout): array
+	{
+		$ch = curl_init($url);
+		if ($ch === false) {
+			throw new RuntimeException('curl could not start');
+		}
+		// Never set CURLOPT_POSTFIELDS for a GET: libcurl switches the
+		// method to POST as soon as the option is set, even to an empty
+		// string — Google then answers 404 for places/{id} (seen 10.10.2026).
+		$options = [
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_HTTPHEADER => $headers,
+			CURLOPT_TIMEOUT => $timeout,
+		] + ($body === null
+			? [CURLOPT_HTTPGET => true]
+			: [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body]);
+		curl_setopt_array($ch, $options);
+		$response = curl_exec($ch);
+		if ($response === false) {
+			$error = curl_error($ch);
+			curl_close($ch);
+			throw new RuntimeException($error);
+		}
+		$status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+		curl_close($ch);
+		return ['status' => $status, 'body' => (string)$response];
+	}
+
+	/** @return array{status: int, body: string} */
+	private static function streamAnswer(string $url, array $headers, string|null $body, int $timeout): array
+	{
+		$context = stream_context_create(['http' => [
+			'method' => $body === null ? 'GET' : 'POST',
+			'header' => implode("\r\n", $headers),
+			'content' => $body ?? '',
+			'timeout' => $timeout,
+			'ignore_errors' => true,
+		]]);
+		// Warnings are collected instead of silenced: the first one says why the request failed.
+		$warnings = [];
+		set_error_handler(static function (int $level, string $message) use (&$warnings): bool {
+			$warnings[] = [$level, $message];
+			return true;
+		});
+		try {
+			$response = file_get_contents($url, false, $context);
+		} finally {
+			restore_error_handler();
+		}
+		if ($response === false) {
+			throw new RuntimeException($warnings === [] ? 'request failed' : $warnings[0][1]);
+		}
+		$status = 0;
+		foreach ($http_response_header ?? [] as $line) {
+			if (preg_match('~^HTTP/\S+\s+(\d{3})~', $line, $match)) {
+				$status = (int)$match[1];
+			}
+		}
+		return ['status' => $status, 'body' => $response];
 	}
 
 	/**
@@ -159,41 +172,11 @@ class Places
 			if (!is_array($review)) {
 				continue;
 			}
-			$author = is_array($review['authorAttribution'] ?? null) ? $review['authorAttribution'] : [];
-			$name = trim((string)($author['displayName'] ?? ''));
-			$date = substr((string)($review['publishTime'] ?? ''), 0, 10);
-			if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-				$date = $today;
+			[$entry, $message] = self::parseReview($review, $today);
+			$messages[] = $message;
+			if ($entry !== null) {
+				$reviews[] = $entry;
 			}
-			$text = trim((string)(($review['originalText'] ?? $review['text'] ?? [])['text'] ?? ''));
-			$label = ($name !== '' ? $name : 'anonymous') . ', ' . $date;
-			if ($text === '') {
-				$messages[] = '  skipped (no text): ' . $label;
-				continue;
-			}
-			// `name` is "places/<place>/reviews/<id>"; the id is what sayamaapps.koe.approved lists.
-			$id = (string)($review['name'] ?? '');
-			$slash = strrpos($id, '/');
-			$id = $slash === false ? $id : substr($id, $slash + 1);
-			// The link to the review and the author is googleMapsUri (Places
-			// policies); there is no stand-in when it is missing.
-			$url = trim((string)($review['googleMapsUri'] ?? ''));
-			$photo = trim((string)($author['photoUri'] ?? ''));
-			$entry = [
-				'id'     => $id !== '' ? $id : null,
-				'name'   => $name,
-				'date'   => $date,
-				'rating' => (int)($review['rating'] ?? 5),
-				'text'   => $text,
-			];
-			if ($url !== '') {
-				$entry['url'] = $url;
-			}
-			if (preg_match('~^https://[^\s"<>]+$~i', $photo)) {
-				$entry['photo'] = $photo;
-			}
-			$reviews[] = $entry;
-			$messages[] = '  ' . ($entry['id'] ?? '(no id)') . '  ' . $label . ', ' . $entry['rating'] . ' stars' . ($url === '' ? ' (no link)' : '');
 		}
 		usort($reviews, fn ($a, $b) => strcmp($b['date'], $a['date']));
 		$rating = $details['rating'] ?? null;
@@ -207,6 +190,54 @@ class Places
 		$messages[] = count($reviews) . ' reviews with text; Google reports ' . $data['count']
 			. ' with an average of ' . (string)($data['rating'] ?? '?') . '.';
 		return ['data' => $data, 'messages' => $messages];
+	}
+
+	/**
+	 * One review of a details answer: the entry Koe keeps, or null when it has
+	 * no text, and the line for the log either way.
+	 *
+	 * @return array{0: array<string,mixed>|null, 1: string}
+	 */
+	private static function parseReview(array $review, string $today): array
+	{
+		$author = is_array($review['authorAttribution'] ?? null) ? $review['authorAttribution'] : [];
+		$name = trim((string)($author['displayName'] ?? ''));
+		$date = substr((string)($review['publishTime'] ?? ''), 0, 10);
+		if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+			$date = $today;
+		}
+		$text = trim((string)(($review['originalText'] ?? $review['text'] ?? [])['text'] ?? ''));
+		$label = ($name !== '' ? $name : 'anonymous') . ', ' . $date;
+		if ($text === '') {
+			return [null, '  skipped (no text): ' . $label];
+		}
+		// The link to the review and the author is googleMapsUri (Places
+		// policies); there is no stand-in when it is missing.
+		$url = trim((string)($review['googleMapsUri'] ?? ''));
+		$entry = [
+			'id'     => self::reviewId((string)($review['name'] ?? '')),
+			'name'   => $name,
+			'date'   => $date,
+			'rating' => (int)($review['rating'] ?? 5),
+			'text'   => $text,
+		];
+		if ($url !== '') {
+			$entry['url'] = $url;
+		}
+		$photo = trim((string)($author['photoUri'] ?? ''));
+		if (preg_match('~^https://[^\s"<>]+$~i', $photo)) {
+			$entry['photo'] = $photo;
+		}
+		$message = '  ' . ($entry['id'] ?? '(no id)') . '  ' . $label . ', ' . $entry['rating'] . ' stars' . ($url === '' ? ' (no link)' : '');
+		return [$entry, $message];
+	}
+
+	/** `name` is "places/<place>/reviews/<id>"; the id is what sayamaapps.koe.approved lists. Null when empty. */
+	private static function reviewId(string $name): string|null
+	{
+		$slash = strrpos($name, '/');
+		$id = $slash === false ? $name : substr($name, $slash + 1);
+		return $id !== '' ? $id : null;
 	}
 
 	/** The key must never appear in any output — not even via a quoted error message. */
