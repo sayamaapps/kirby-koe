@@ -116,6 +116,10 @@ A site can silence a deprecation with `Kirby\Cms\Helpers::$deprecations['option-
 Tests: `composer test` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
 
 
+## Implementation notes
+
+The Places client (`Sayamaapps\Koe\Places`, with its own transport: curl, or streams without curl) and the translation table (`Sayamaapps\Koe\I18n`) do not use Kirby's `Remote` and `I18n`. The core also runs without Kirby in the `koe-fetch` CLI, and the snippet texts must match what the CLI prints. Everything else follows the Kirby standard: options, translations, site methods, routes and the cache.
+
 ## Privacy
 
 - **No request from the visitor's browser.** No script, embed, font or image comes from Google. Profile pictures and the optional "Google Maps" logo are served from your site; Google opens only when a visitor clicks a link.
