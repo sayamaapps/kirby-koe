@@ -42,6 +42,7 @@ class Options
 		}
 	}
 
+	/** Reads `koe.<key>`; `null` counts as not set and gives the default. */
 	public static function get(App $kirby, string $key, mixed $default = null): mixed
 	{
 		return $kirby->option(self::PREFIX . $key) ?? $default;
@@ -50,8 +51,8 @@ class Options
 	/**
 	 * The Places API key: `koe.key` (a string or a closure returning one),
 	 * otherwise the environment variable GOOGLE_PLACES_API_KEY — getenv(),
-	 * then the server environment, read through Kirby's environment(), where
-	 * Apache's SetEnv lands under FastCGI. Null when none is set.
+	 * then $_SERVER, read at call time (Apache's SetEnv lands there under
+	 * FastCGI, also when it is set after the app has booted). Null when none is set.
 	 */
 	public static function key(App $kirby): string|null
 	{
@@ -59,7 +60,7 @@ class Options
 		if ($key instanceof Closure) {
 			$key = $key();
 		}
-		foreach ([$key, getenv(self::ENV_KEY), $kirby->environment()->get(self::ENV_KEY)] as $candidate) {
+		foreach ([$key, getenv(self::ENV_KEY), $_SERVER[self::ENV_KEY] ?? null] as $candidate) {
 			if (is_string($candidate) && trim($candidate) !== '') {
 				return trim($candidate);
 			}
@@ -109,9 +110,9 @@ class Options
 	}
 
 	/**
-	 * Selection rules, each with the default that the pre-1.0 copy had as a
-	 * constant. `approved` is null (off) or a list of review ids, and
-	 * `placeId` the place (null = not configured).
+	 * Selection rules, each with the default of its Reviews constant.
+	 * `approved` is null (off) or a list of review ids, and `placeId` the
+	 * place (null = not configured).
 	 *
 	 * @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, placeId:?string}
 	 */

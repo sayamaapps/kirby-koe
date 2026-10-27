@@ -29,6 +29,7 @@ class I18n
 	/** @var array<string, array<string,string>> */
 	private static array $tables = [];
 
+	/** The language of the strings: `en` or `de`. */
 	public static function language(): string
 	{
 		return self::$language;
@@ -52,6 +53,7 @@ class I18n
 			: number_format($value, $decimals, '.', '');
 	}
 
+	/** Sets the language; anything but a shipped language means English. */
 	public static function setLanguage(string $language): void
 	{
 		self::$language = in_array($language, self::LANGUAGES, true) ? $language : 'en';

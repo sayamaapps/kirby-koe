@@ -14,17 +14,6 @@ use Kirby\Filesystem\F;
 F::loadClasses(require __DIR__ . '/autoload.php', __DIR__);
 require_once __DIR__ . '/legacy.php';
 
-/*
- * Old copy still there? site/plugins/bewertungen/ (the pre-1.0 copy of this
- * plugin) can sit next to the package after an incomplete switch. Both load
- * without conflict — different plugin id, snippet name and site methods — so
- * the package stays active (a template calling $site->koeReviews() must not
- * fail). It only says so in the error log until the copy is deleted.
- */
-if (class_exists('Bewertungen\\Stimmen', false)) {
-	error_log('Koe: site/plugins/bewertungen/ (the pre-1.0 copy) still exists next to the package — delete it.');
-}
-
 Kirby::plugin(
 	name: 'sayamaapps/koe',
 	extends: [

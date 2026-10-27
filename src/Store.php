@@ -6,6 +6,7 @@ use Closure;
 use DateTimeImmutable;
 use Kirby\Cache\Cache;
 use Kirby\Cache\FileCache;
+use Koe\PlacesException;
 
 /**
  * The short-lived server-side cache of the reviews — the only place Koe keeps
@@ -33,10 +34,13 @@ use Kirby\Cache\FileCache;
  */
 class Store
 {
+	/** Cache entry of the reviews. */
 	public const DATA = 'reviews';
 
 	/** Profile pictures above this size are not kept (Google's are a few KB). */
 	public const MAX_AVATAR_BYTES = 262144;
+
+	/** Cache entry that marks a failed refresh, which waits RETRY_MINUTES. */
 	public const RETRY = 'retry';
 
 	/** Pause after a failed refresh (and the longest a running one may take). */

@@ -68,10 +68,10 @@ final class ReviewsTest extends TestCase
 		$this->assertSame(['NoPic' => null, 'Pic' => 'abc123'], array_column($out, 'avatar', 'name'), 'avatar key passed through');
 	}
 
-	public function testDefaultRulesAreThePre10Constants(): void
+	public function testDefaultRulesAreTheConstants(): void
 	{
 		$rules = Reviews::defaultRules();
-		$this->assertSame([5, 80, 24, 3, 280, null], array_slice(array_values($rules), 0, 6), 'selection defaults are the pre-1.0 constants');
+		$this->assertSame([5, 80, 24, 3, 280, null], array_slice(array_values($rules), 0, 6), 'selection defaults are the public constants');
 		$this->assertNull($rules['placeId'], 'no place by default');
 		$this->assertFalse(array_key_exists('maxAgeDays', $rules), 'no file, so no file age');
 	}

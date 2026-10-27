@@ -3,6 +3,7 @@
 namespace Sayamaapps\Koe;
 
 use Closure;
+use Koe\PlacesException;
 use RuntimeException;
 
 /**
@@ -27,8 +28,14 @@ class Places
 {
 	/** Fields the details call asks for. `reviews` returns all sub-fields, including googleMapsUri. */
 	public const DETAILS_MASK = 'id,displayName,rating,userRatingCount,reviews';
+
+	/** Base address of the Places API (New), version 1. */
 	public const ENDPOINT = 'https://places.googleapis.com/v1/';
 
+	/**
+	 * @param $transport the HTTP client, see the class comment
+	 * @param $key the API key, sent only in the request header
+	 */
 	public function __construct(private readonly Closure $transport, private readonly string $key)
 	{
 	}

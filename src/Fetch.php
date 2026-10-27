@@ -3,6 +3,7 @@
 namespace Sayamaapps\Koe;
 
 use Closure;
+use Koe\PlacesException;
 
 /**
  * The lookup behind bin/koe-fetch: settings from the environment (or
@@ -11,7 +12,7 @@ use Closure;
  * It writes nothing: the site fetches on its own, when a visitor needs the
  * reviews (Store).
  *
- * Exit codes, kept from the pre-1.0 script:
+ * Exit codes:
  *   0  done
  *   1  error: no query, nothing found, API failure
  *   3  no GOOGLE_PLACES_API_KEY
@@ -26,11 +27,22 @@ use Closure;
  */
 class Fetch
 {
+	/** Environment variable with the API key. */
 	public const ENV_KEY = 'GOOGLE_PLACES_API_KEY';
+
+	/** Environment variable with the language of the report (`en` by default). */
 	public const ENV_LANGUAGE = 'KOE_LANGUAGE';
+
+	/** Environment variable with the search text. */
 	public const ENV_QUERY = 'KOE_QUERY';
+
+	/** Exit code: an error (no query, nothing found, API failure). */
 	public const EXIT_ERROR = 1;
+
+	/** Exit code: no API key. */
 	public const EXIT_NO_KEY = 3;
+
+	/** Exit code: done. */
 	public const EXIT_OK = 0;
 
 	/** @return array<string,string|true> */
@@ -98,6 +110,7 @@ class Fetch
 		return self::EXIT_OK;
 	}
 
+	/** The help text of bin/koe-fetch. */
 	public static function usage(): string
 	{
 		return <<<TXT

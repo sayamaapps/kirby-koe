@@ -6,11 +6,11 @@
  * which runs without Kirby. tests/AutoloadTest.php checks it against src/.
  */
 return [
+	'koe\\placesexception'            => 'src/PlacesException.php',
 	'sayamaapps\\koe\\fetch'          => 'src/Fetch.php',
 	'sayamaapps\\koe\\i18n'           => 'src/I18n.php',
 	'sayamaapps\\koe\\options'        => 'src/Options.php',
 	'sayamaapps\\koe\\places'         => 'src/Places.php',
-	'sayamaapps\\koe\\placesexception' => 'src/PlacesException.php',
 	'sayamaapps\\koe\\plugin'         => 'src/Plugin.php',
 	'sayamaapps\\koe\\reviews'        => 'src/Reviews.php',
 	'sayamaapps\\koe\\site'           => 'src/Site.php',

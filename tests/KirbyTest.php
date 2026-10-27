@@ -390,6 +390,15 @@ final class KirbyTest extends TestCase
 		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-from-closure', $this->calls[0]['headers'] ?? [], true), 'koe.key as closure');
 	}
 
+	public function testKeyFromTheEnvironmentIsReadWhenSetAfterTheAppBooted(): void
+	{
+		$kirby = $this->app(['koe.active' => true, 'koe.placeId' => 'ChIJExample']);
+		$_SERVER['GOOGLE_PLACES_API_KEY'] = 'AIza-set-after-boot';
+		Plugin::reviews($kirby, Options::rules($kirby), $this->transport(), $this->queueing());
+		$this->drain();
+		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-set-after-boot', $this->calls[0]['headers'] ?? [], true), 'key from $_SERVER at fetch time');
+	}
+
 	public function testNoticeIsWordedFromTheOptions(): void
 	{
 		$this->answer = ['id' => 'ChIJExample', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => [$this->review('Notice', '-3 days', null, 5, 'id-notice')]];
@@ -423,6 +432,12 @@ final class KirbyTest extends TestCase
 		$this->assertSame(404, $off->call('koe/avatar/' . basename($with['avatar']))->code(), 'module off: 404');
 	}
 
+	public function testPluginRegistersTheSnippetUnderACleanPath(): void
+	{
+		$kirby = $this->app($this->on());
+		$this->assertSame(dirname(__DIR__) . '/snippets/reviews.php', $kirby->plugin('sayamaapps/koe')->extends()['snippets']['koe/reviews'], 'no ../ in the snippet path');
+	}
+
 	public function testSiteSnippetOverridesThePackageSnippet(): void
 	{
 		$this->answer['reviews'] = [$this->review('Notice', '-3 days', null, 5, 'id-notice')];
@@ -441,6 +456,7 @@ final class KirbyTest extends TestCase
 		$this->assertSame('', trim($html), 'without koe.active the snippet prints nothing');
 		$this->assertSame([], $this->queue, 'without koe.active nothing is fetched');
 		$this->assertSame('Read all on Google', $kirby->translation('en')->get('koe.readAll'), 'strings registered as Kirby translations');
+		$this->assertSame('Read all on Google', $kirby->translation('en')->get('sayamaapps.koe.readAll'), 'the sayamaapps.koe prefix too');
 		$this->assertSame('Alle auf Google lesen', $kirby->translation('de')->get('koe.readAll'), 'German Kirby translation');
 		$this->assertTrue(function_exists('koe_option'), 'koe_option() helper');
 		[$r] = $this->render(['koe.active' => 'yes'] + $this->on());

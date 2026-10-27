@@ -3,7 +3,7 @@
 /**
  * German strings of the default snippet. Keys and placeholders as in en.php;
  * tests/I18nTest.php checks that both files have the same keys and
- * placeholders. The wording is the one the pre-1.0 copy printed.
+ * placeholders.
  */
 return [
 	'month.1' => 'Januar', 'month.2' => 'Februar', 'month.3' => 'März', 'month.4' => 'April',

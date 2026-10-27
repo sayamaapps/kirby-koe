@@ -5,7 +5,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Sayamaapps\Koe\Fetch;
 use Sayamaapps\Koe\Places;
-use Sayamaapps\Koe\PlacesException;
 
 /**
  * The Places client and the koe-fetch lookup against recorded Places API
@@ -23,7 +22,7 @@ use Sayamaapps\Koe\PlacesException;
  */
 #[CoversClass(\Sayamaapps\Koe\Fetch::class)]
 #[CoversClass(\Sayamaapps\Koe\Places::class)]
-#[CoversClass(\Sayamaapps\Koe\PlacesException::class)]
+#[CoversClass(\Koe\PlacesException::class)]
 final class PlacesTest extends TestCase
 {
 	private const KEY = 'AIza-not-a-real-key-0000';
@@ -60,7 +59,7 @@ final class PlacesTest extends TestCase
 	{
 		try {
 			(new Places($this->transport($script), self::KEY))->search('x');
-		} catch (PlacesException $e) {
+		} catch (\Koe\PlacesException $e) {
 			return $e->getMessage();
 		}
 		throw new \RuntimeException('no exception');

@@ -33,7 +33,7 @@ class Reviews
 	/** Minimum text length in characters (after trim). */
 	public const MIN_LENGTH = 80;
 
-	// ---- Default selection rules (the pre-1.0 constants) -------------------
+	// ---- Default selection rules --------------------------------------------
 	/** Only reviews with at least this many stars. */
 	public const MIN_RATING = 5;
 

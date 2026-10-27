@@ -16,7 +16,8 @@ final class AutoloadTest extends TestCase
 		$map = require dirname(__DIR__) . '/autoload.php';
 
 		foreach ($map as $class => $file) {
-			$expected = strtolower('Sayamaapps\\Koe\\' . basename($file, '.php'));
+			preg_match('/^namespace ([^;]+);/m', (string)file_get_contents(dirname(__DIR__) . '/' . $file), $match);
+			$expected = strtolower(($match[1] ?? '') . '\\' . basename($file, '.php'));
 			Assert::assertSame($expected, $class, "$file is listed under the wrong key");
 		}
 	}

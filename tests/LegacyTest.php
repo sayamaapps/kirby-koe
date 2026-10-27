@@ -51,10 +51,20 @@ final class LegacyTest extends TestCase
 	{
 		require_once dirname(__DIR__) . '/legacy.php';
 
-		foreach (['Fetch', 'I18n', 'Options', 'Places', 'PlacesException', 'Plugin', 'Reviews', 'Store'] as $name) {
+		foreach (['Fetch', 'I18n', 'Options', 'Places', 'Plugin', 'Reviews', 'Store'] as $name) {
 			$class = new \ReflectionClass('Koe\\' . $name);
 			Assert::assertSame('Sayamaapps\\Koe\\' . $name, $class->getName(), "Koe\\$name is an alias");
 		}
 		Assert::assertSame('Read all on Google', Koe\I18n::t('readAll'), 'the alias works');
+	}
+
+	public function testPlacesExceptionKeepsItsName(): void
+	{
+		require_once dirname(__DIR__) . '/legacy.php';
+
+		$exception = new Koe\PlacesException('message');
+		Assert::assertSame('Koe\\PlacesException', $exception::class, 'the class name is unchanged');
+		Assert::assertInstanceOf(RuntimeException::class, $exception, 'still a RuntimeException');
+		Assert::assertFalse(class_exists('Sayamaapps\\Koe\\PlacesException', false), 'no second name for the class');
 	}
 }
