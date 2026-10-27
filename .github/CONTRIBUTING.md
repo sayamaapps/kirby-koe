@@ -28,6 +28,13 @@ composer analyze:unused           # unused Composer packages
 composer analyze:require-checker  # undeclared dependencies
 ```
 
+Copy/paste detection uses phpcpd. It is installed globally, because it is abandoned and conflicts with PHPUnit 11 when installed in this package:
+
+```sh
+composer global require sebastian/phpcpd:6.0.3
+phpcpd src index.php legacy.php autoload.php config tests   # the global bin directory must be in PATH
+```
+
 Code style is checked with PHP-CS-Fixer and the Kirby rule set (`getkirby/php-cs`). The package is installed globally, because it needs PHP 8.3 or newer and this package supports PHP 8.2:
 
 ```sh
