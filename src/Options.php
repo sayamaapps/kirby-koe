@@ -15,7 +15,6 @@ use Kirby\Cms\Helpers;
  * Both spellings work, flat (`'sayamaapps.koe.active' => true`) and nested
  * (`'koe' => ['active' => true]`), because Kirby's option() finds both.
  *
- * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder

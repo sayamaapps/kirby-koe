@@ -18,7 +18,6 @@ use Kirby\Http\Response;
  * LiteSpeed; elsewhere that one visitor waits for it). The views after it
  * show the reviews until the cache expires.
  *
- * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
@@ -80,7 +79,7 @@ class Plugin
 	 * Fetches the reviews into the cache. Failures go to the error log (also
 	 * outside debug mode: they need someone to act), the key scrubbed.
 	 *
-	 * @param ?Closure $transport the HTTP client (see Places); null = the real one
+	 * @param $transport the HTTP client (see Places); null = the real one
 	 * @return ?string null when done, otherwise what went wrong
 	 */
 	public static function refresh(App $kirby, array $rules, Closure|null $transport = null): string|null
@@ -112,8 +111,8 @@ class Plugin
 	 * Rating, count and the selected reviews, or null (= show nothing: no
 	 * place id, no key, nothing cached yet, or a place without rating).
 	 *
-	 * @param ?Closure $transport passed on to refresh() (null = the real one)
-	 * @param ?Closure $defer runs the refresh job instead of deferring it after the response (null = the server way)
+	 * @param $transport passed on to refresh() (null = the real one)
+	 * @param $defer runs the refresh job instead of deferring it after the response (null = the server way)
 	 * @return array{rating: float, count: int, placeId: string, reviews: array<int, array<string, mixed>>, limit: int}|null
 	 */
 	public static function reviews(App $kirby, array $rules, Closure|null $transport = null, Closure|null $defer = null): array|null

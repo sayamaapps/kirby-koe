@@ -8,7 +8,6 @@ use Kirby\Cms\App;
  * What the site methods return: the reviews a page shows and the address of
  * the Google profile. config/site-methods.php only delegates here.
  *
- * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder

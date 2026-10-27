@@ -25,7 +25,6 @@ use Kirby\Cache\FileCache;
  * a review that is gone included). Kirby removes an expired entry when it is
  * read, which happens on the next page view.
  *
- * @package   Sayamaapps\Koe
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
  * @copyright Simon Räder
