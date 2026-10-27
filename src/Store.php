@@ -89,7 +89,7 @@ class Store
 	}
 
 	/** @param resource|false|null $handle */
-	private static function closeLock($handle): void
+	private static function closeLock(mixed $handle): void
 	{
 		if (is_resource($handle)) {
 			flock($handle, LOCK_UN);
@@ -129,7 +129,7 @@ class Store
 	 *
 	 * @return resource|false|null
 	 */
-	private static function openLock(Cache $cache)
+	private static function openLock(Cache $cache): mixed
 	{
 		if (!$cache instanceof FileCache) {
 			return null;
