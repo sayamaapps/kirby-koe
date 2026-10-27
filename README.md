@@ -80,7 +80,7 @@ $r = site()->koeReviews();   // null: show nothing
 
 ## Options
 
-Keys are `sayamaapps.koe.<name>`, flat or nested. `null` means "not set". The older spelling `koe.<name>` is still read; see [Deprecations](#deprecations).
+Keys are `sayamaapps.koe.<name>`, written flat (`'sayamaapps.koe.active' => true`) or grouped (`'sayamaapps.koe' => ['active' => true]`). The fully nested form `'sayamaapps' => ['koe' => [...]]` is not read. `null` means "not set". The older spelling `koe.<name>` is still read; see [Deprecations](#deprecations).
 
 | Option | Default | Description |
 |---|---|---|

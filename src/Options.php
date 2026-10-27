@@ -7,13 +7,14 @@ use Kirby\Cms\App;
 use Kirby\Cms\Helpers;
 
 /**
- * Reads `koe.*` options.
+ * Reads the `sayamaapps.koe.*` options.
  *
  * `null` counts as "not set", like Kirby's own option() (A::get() checks
  * isset() as well), so `'sayamaapps.koe.logo' => null` falls back to the default.
  *
- * Both spellings work, flat (`'sayamaapps.koe.active' => true`) and nested
- * (`'koe' => ['active' => true]`), because Kirby's option() finds both.
+ * Two spellings are read: flat (`'sayamaapps.koe.active' => true`) and grouped
+ * (`'sayamaapps.koe' => ['active' => true]`). The fully nested form
+ * (`'sayamaapps' => ['koe' => [...]]`) is not read once the plugin is registered.
  *
  * @author    Simon Räder
  * @link      https://github.com/sayamaapps/kirby-koe
