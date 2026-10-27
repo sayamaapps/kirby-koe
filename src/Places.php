@@ -32,6 +32,17 @@ class Places
 	{
 	}
 
+	/** Google's status and message for an answer other than 200, the key scrubbed. */
+	private function apiError(int $status, mixed $decoded): PlacesException
+	{
+		$error = is_array($decoded) && is_array($decoded['error'] ?? null) ? $decoded['error'] : [];
+		$detail = trim((string)($error['status'] ?? '') . ' ' . (string)($error['message'] ?? ''));
+		$hint = $status === 429 || ($error['status'] ?? '') === 'RESOURCE_EXHAUSTED'
+			? ' — the daily quota of the Google Cloud project is used up.'
+			: '';
+		return new PlacesException('Places API answered ' . $status . ($detail !== '' ? ' ' . self::scrub($detail, $this->key) : '') . $hint);
+	}
+
 	/** @throws PlacesException */
 	private function call(string $path, string $fieldMask, array|null $body = null): array
 	{
@@ -56,27 +67,6 @@ class Places
 			throw new PlacesException('Places API answered 200 with a body that is not JSON.');
 		}
 		return $decoded;
-	}
-
-	/** Google's status and message for an answer other than 200, the key scrubbed. */
-	private function apiError(int $status, mixed $decoded): PlacesException
-	{
-		$error = is_array($decoded) && is_array($decoded['error'] ?? null) ? $decoded['error'] : [];
-		$detail = trim((string)($error['status'] ?? '') . ' ' . (string)($error['message'] ?? ''));
-		$hint = $status === 429 || ($error['status'] ?? '') === 'RESOURCE_EXHAUSTED'
-			? ' — the daily quota of the Google Cloud project is used up.'
-			: '';
-		return new PlacesException('Places API answered ' . $status . ($detail !== '' ? ' ' . self::scrub($detail, $this->key) : '') . $hint);
-	}
-
-	/** ext-curl when available, otherwise the HTTP stream wrapper. */
-	public static function defaultTransport(int $timeout = 30): Closure
-	{
-		return function (string $url, array $headers, string|null $body) use ($timeout): array {
-			return function_exists('curl_init')
-				? self::curlAnswer($url, $headers, $body, $timeout)
-				: self::streamAnswer($url, $headers, $body, $timeout);
-		};
 	}
 
 	/** @return array{status: int, body: string} */
@@ -108,37 +98,14 @@ class Places
 		return ['status' => $status, 'body' => (string)$response];
 	}
 
-	/** @return array{status: int, body: string} */
-	private static function streamAnswer(string $url, array $headers, string|null $body, int $timeout): array
+	/** ext-curl when available, otherwise the HTTP stream wrapper. */
+	public static function defaultTransport(int $timeout = 30): Closure
 	{
-		$context = stream_context_create(['http' => [
-			'method' => $body === null ? 'GET' : 'POST',
-			'header' => implode("\r\n", $headers),
-			'content' => $body ?? '',
-			'timeout' => $timeout,
-			'ignore_errors' => true,
-		]]);
-		// Warnings are collected instead of silenced: the first one says why the request failed.
-		$warnings = [];
-		set_error_handler(static function (int $level, string $message) use (&$warnings): bool {
-			$warnings[] = [$level, $message];
-			return true;
-		});
-		try {
-			$response = file_get_contents($url, false, $context);
-		} finally {
-			restore_error_handler();
-		}
-		if ($response === false) {
-			throw new RuntimeException($warnings === [] ? 'request failed' : $warnings[0][1]);
-		}
-		$status = 0;
-		foreach ($http_response_header ?? [] as $line) {
-			if (preg_match('~^HTTP/\S+\s+(\d{3})~', $line, $match)) {
-				$status = (int)$match[1];
-			}
-		}
-		return ['status' => $status, 'body' => $response];
+		return function (string $url, array $headers, string|null $body) use ($timeout): array {
+			return function_exists('curl_init')
+				? self::curlAnswer($url, $headers, $body, $timeout)
+				: self::streamAnswer($url, $headers, $body, $timeout);
+		};
 	}
 
 	/**
@@ -271,5 +238,38 @@ class Places
 			'id' => (string)$places[0]['id'],
 			'name' => (string)($places[0]['displayName']['text'] ?? ''),
 		];
+	}
+
+	/** @return array{status: int, body: string} */
+	private static function streamAnswer(string $url, array $headers, string|null $body, int $timeout): array
+	{
+		$context = stream_context_create(['http' => [
+			'method' => $body === null ? 'GET' : 'POST',
+			'header' => implode("\r\n", $headers),
+			'content' => $body ?? '',
+			'timeout' => $timeout,
+			'ignore_errors' => true,
+		]]);
+		// Warnings are collected instead of silenced: the first one says why the request failed.
+		$warnings = [];
+		set_error_handler(static function (int $level, string $message) use (&$warnings): bool {
+			$warnings[] = [$level, $message];
+			return true;
+		});
+		try {
+			$response = file_get_contents($url, false, $context);
+		} finally {
+			restore_error_handler();
+		}
+		if ($response === false) {
+			throw new RuntimeException($warnings === [] ? 'request failed' : $warnings[0][1]);
+		}
+		$status = 0;
+		foreach ($http_response_header ?? [] as $line) {
+			if (preg_match('~^HTTP/\S+\s+(\d{3})~', $line, $match)) {
+				$status = (int)$match[1];
+			}
+		}
+		return ['status' => $status, 'body' => $response];
 	}
 }

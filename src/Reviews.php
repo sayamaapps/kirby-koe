@@ -76,20 +76,6 @@ class Reviews
 		return array_slice($hits, 0, $rules['maxCount']);
 	}
 
-	/** The rules of filter() for one review: stars, text length, date, age and approval. */
-	private static function passes(array $review, array $rules, string|null $oldest): bool
-	{
-		$text = trim((string)($review['text'] ?? ''));
-		$date = (string)($review['date'] ?? '');
-		$id = isset($review['id']) ? (string)$review['id'] : null;
-		$approved = $rules['approved'];
-		return (int)($review['rating'] ?? 0) >= $rules['minRating']
-			&& mb_strlen($text) >= $rules['minLength']
-			&& preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1
-			&& ($oldest === null || $date >= $oldest)
-			&& ($approved === null || ($id !== null && in_array($id, $approved, true)));
-	}
-
 	/**
 	 * The notice for visitors: how the reviews shown were selected and in what
 	 * order, worded from the rules actually in force (never a fixed text, so it
@@ -125,6 +111,20 @@ class Reviews
 		}
 		$criteria[] = I18n::t('notice.order');
 		return I18n::t('notice.selection', ['criteria' => implode(', ', $criteria)]);
+	}
+
+	/** The rules of filter() for one review: stars, text length, date, age and approval. */
+	private static function passes(array $review, array $rules, string|null $oldest): bool
+	{
+		$text = trim((string)($review['text'] ?? ''));
+		$date = (string)($review['date'] ?? '');
+		$id = isset($review['id']) ? (string)$review['id'] : null;
+		$approved = $rules['approved'];
+		return (int)($review['rating'] ?? 0) >= $rules['minRating'] &&
+			mb_strlen($text) >= $rules['minLength'] &&
+			preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1 &&
+			($oldest === null || $date >= $oldest) &&
+			($approved === null || ($id !== null && in_array($id, $approved, true)));
 	}
 
 	/**
