@@ -12,6 +12,28 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [Unreleased]
+
+### Changed
+
+- **Option keys are `sayamaapps.koe.<name>`.** The keys `koe.<name>` keep
+  working as a fallback until the next major version, when the new key is
+  not set. `Sayamaapps\Koe\Options::PREFIX` is now `sayamaapps.koe.`; the
+  old spelling is `Options::LEGACY_PREFIX`.
+- **Classes are in the namespace `Sayamaapps\Koe`.** The old `Koe\` names
+  are aliases.
+- **`koe_option()` is deprecated.** Use `Sayamaapps\Koe\Options::get()`.
+  The old function keeps working.
+- **Debug mode and the old option keys.** Kirby's debug mode turns the
+  deprecation for `koe.<name>` into an error page on every page that calls
+  `koeReviews()`. Switch the options to `sayamaapps.koe.<name>`, or turn
+  debug mode off on sites that still use the old keys.
+
+### Fixed
+
+- **The default snippet raises no deprecation** in debug mode when the
+  title and logo are set with the new option keys.
+
 ## [2.2.1] — 2026-10-26
 
 ### Fixed
