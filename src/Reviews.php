@@ -66,26 +66,28 @@ class Reviews
 		$oldest = $rules['maxAgeMonths'] > 0
 			? $today->modify('-' . $rules['maxAgeMonths'] . ' months')->format('Y-m-d')
 			: null;
-		$approved = $rules['approved'];
 		$hits = [];
 		foreach ($reviews as $review) {
-			if (!is_array($review)) {
-				continue;
+			if (is_array($review) && self::passes($review, $rules, $oldest)) {
+				$hits[] = $review;
 			}
-			$text = trim((string)($review['text'] ?? ''));
-			$date = (string)($review['date'] ?? '');
-			$id = isset($review['id']) ? (string)$review['id'] : null;
-			if ((int)($review['rating'] ?? 0) < $rules['minRating'] ||
-				mb_strlen($text) < $rules['minLength'] ||
-				!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ||
-				($oldest !== null && $date < $oldest) ||
-				($approved !== null && ($id === null || !in_array($id, $approved, true)))) {
-				continue;
-			}
-			$hits[] = $review;
 		}
 		usort($hits, fn ($a, $b) => strcmp((string)$b['date'], (string)$a['date']));
 		return array_slice($hits, 0, $rules['maxCount']);
+	}
+
+	/** The rules of filter() for one review: stars, text length, date, age and approval. */
+	private static function passes(array $review, array $rules, string|null $oldest): bool
+	{
+		$text = trim((string)($review['text'] ?? ''));
+		$date = (string)($review['date'] ?? '');
+		$id = isset($review['id']) ? (string)$review['id'] : null;
+		$approved = $rules['approved'];
+		return (int)($review['rating'] ?? 0) >= $rules['minRating']
+			&& mb_strlen($text) >= $rules['minLength']
+			&& preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1
+			&& ($oldest === null || $date >= $oldest)
+			&& ($approved === null || ($id !== null && in_array($id, $approved, true)));
 	}
 
 	/**
