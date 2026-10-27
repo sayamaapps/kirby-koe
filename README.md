@@ -19,7 +19,7 @@ Koe shows a business's Google rating, its review count and a few selected review
 
 - PHP 8.2–8.5 with `mbstring`; `curl` recommended. Outgoing HTTPS to `places.googleapis.com` and `*.googleusercontent.com`.
 - Kirby 5 with a writable cache directory (`site/cache/` by default).
-- A Google Cloud project with **Places API (New)** enabled and an API key restricted to that API. Use one project and key per site, and cap the daily quota: a fetch is one request, so 30 per day is enough at any `sayamaapps.koe.cacheHours`.
+- A Google Cloud project with **Places API (New)** enabled and an API key restricted to that API. Use one project and key per site, and cap the daily quota: a fetch is one request, so 30 per day is enough at any `koe.cacheHours`.
 
 ## Installation
 
@@ -43,12 +43,12 @@ Ignore `site/cache/` in git too, and leave it out of backups.
 
 ```php
 return [
-    'sayamaapps.koe.active'  => true,
-    'sayamaapps.koe.placeId' => 'ChIJ…',   // from koe-fetch, see below
+    'koe.active'  => true,
+    'koe.placeId' => 'ChIJ…',   // from koe-fetch, see below
 ];
 ```
 
-Keep the key out of git: set `sayamaapps.koe.key` in a file your deploy writes, or the environment variable `GOOGLE_PLACES_API_KEY` on the web server.
+Keep the key out of git: set `koe.key` in a file your deploy writes, or the environment variable `GOOGLE_PLACES_API_KEY` on the web server.
 
 **Show** the reviews in a template:
 
@@ -65,7 +65,7 @@ The section is omitted while Koe is off, misconfigured or the cache is empty. Th
 GOOGLE_PLACES_API_KEY=… KOE_QUERY="Business name, Street 1, 12345 Town" vendor/bin/koe-fetch
 ```
 
-`koe-fetch` prints the place (`Found: Name (ChIJ…)`, the value for `sayamaapps.koe.placeId`) and its reviews with their ids (for `sayamaapps.koe.approved`). It writes nothing. Use the name and address exactly as in the Google profile. Options: `--query=` or `KOE_QUERY`; `--language=` or `KOE_LANGUAGE` (default `en`). Exit codes: `0` done, `1` error, `3` no key. Google returns at most five reviews per place; reviews without text are skipped.
+`koe-fetch` prints the place (`Found: Name (ChIJ…)`, the value for `koe.placeId`) and its reviews with their ids (for `koe.approved`). It writes nothing. Use the name and address exactly as in the Google profile. Options: `--query=` or `KOE_QUERY`; `--language=` or `KOE_LANGUAGE` (default `en`). Exit codes: `0` done, `1` error, `3` no key. Google returns at most five reviews per place; reviews without text are skipped.
 
 **Your own markup.** Create `site/snippets/koe/reviews.php` (Kirby takes it before the package's snippet), or call the site method from any snippet:
 
@@ -80,7 +80,7 @@ $r = site()->koeReviews();   // null: show nothing
 
 ## Options
 
-Keys are `sayamaapps.koe.<name>`, written flat (`'sayamaapps.koe.active' => true`) or grouped (`'sayamaapps.koe' => ['active' => true]`). The fully nested form `'sayamaapps' => ['koe' => [...]]` is not read. `null` means "not set". The older spelling `koe.<name>` is still read; see [Deprecations](#deprecations).
+Keys are `koe.<name>`, written flat (`'koe.active' => true`) or grouped (`'koe' => ['active' => true]`). `null` means "not set".
 
 | Option | Default | Description |
 |---|---|---|
@@ -100,21 +100,18 @@ Keys are `sayamaapps.koe.<name>`, written flat (`'sayamaapps.koe.active' => true
 
 Changing `placeId`, `language`, `cacheHours` or a selection rule makes the next view fetch anew. Kirby's `debug` option makes the error log say why nothing is shown; failed fetches are always logged. Other cache drivers work too, e.g. `'sayamaapps.koe.cache' => ['type' => 'apcu']`.
 
-## Deprecations
+## Names of earlier versions
 
-The new option keys and class names come with this release. The old names keep working until the next major version.
-
-| Old | New | Notes |
+| Name | Now | Notes |
 |---|---|---|
-| `koe.<name>` options | `sayamaapps.koe.<name>` | Read as a fallback when the new key is not set. In Kirby's debug mode a deprecation is triggered (key `option-prefix`). |
-| `koe_option($key, $default)` | `Sayamaapps\Koe\Options::get(kirby(), $key, $default)` | Triggers a deprecation in debug mode (key `koe-function`). |
 | `Koe\*` classes | `Sayamaapps\Koe\*` | Class aliases, loaded with the plugin. |
-| translation keys `koe.<key>` | `sayamaapps.koe.<key>` | Both are registered. |
+| `koe_option($key, $default)` | `Sayamaapps\Koe\Options::get(kirby(), $key, $default)` | Deprecated. Keeps working and raises no notice. |
 
-A site can silence a deprecation with `Kirby\Cms\Helpers::$deprecations['option-prefix'] = false;` (or `'koe-function'`). In Kirby's debug mode a deprecation becomes an error page: with `koe.<name>` keys set, every page that calls `koeReviews()` or `koe_option()` fails until the keys are renamed or the deprecation is silenced.
+## Planned for the next major version
+
+Option keys `sayamaapps.koe.<name>` will replace `koe.<name>`, which is then no longer read, and translation keys `sayamaapps.koe.<key>` will replace `koe.<key>`. The names above will be removed. Sites must rename their keys with that update.
 
 Tests: `composer test` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
-
 
 ## Implementation notes
 
@@ -123,7 +120,7 @@ The Places client (`Sayamaapps\Koe\Places`, with its own transport: curl, or str
 ## Privacy
 
 - **No request from the visitor's browser.** No script, embed, font or image comes from Google. Profile pictures and the optional "Google Maps" logo are served from your site; Google opens only when a visitor clicks a link.
-- **Cache only.** Reviews and pictures stay in Kirby's cache for `sayamaapps.koe.cacheHours` at most, then they are fetched anew. Nothing else from Google is kept. The plugin sets no cookies and uses no browser storage.
+- **Cache only.** Reviews and pictures stay in Kirby's cache for `koe.cacheHours` at most, then they are fetched anew. Nothing else from Google is kept. The plugin sets no cookies and uses no browser storage.
 
 See [PRIVACY.md](PRIVACY.md) (English) and [DATENSCHUTZ.md](DATENSCHUTZ.md) (German text for privacy policies). They are not legal advice.
 

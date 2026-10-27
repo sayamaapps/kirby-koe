@@ -14,33 +14,35 @@ All notable changes to this project are documented here. Versions follow
 
 ## [Unreleased]
 
+Nothing a site has to change. The option keys, the translation keys and the
+old names keep working; the planned changes are listed at the end.
+
 ### Changed
 
-- **Option keys are `sayamaapps.koe.<name>`.** The keys `koe.<name>` keep
-  working as a fallback until the next major version, when the new key is
-  not set. `Sayamaapps\Koe\Options::PREFIX` is now `sayamaapps.koe.`; the
-  old spelling is `Options::LEGACY_PREFIX`.
-- **Classes are in the namespace `Sayamaapps\Koe`.** The old `Koe\` names
-  are aliases.
-- **`koe_option()` is deprecated.** Use `Sayamaapps\Koe\Options::get()`.
-  The old function keeps working.
-- **Debug mode and the old option keys.** Kirby's debug mode turns the
-  deprecation for `koe.<name>` into an error page on every page that calls
-  `koeReviews()`. Switch the options to `sayamaapps.koe.<name>`, or turn
-  debug mode off on sites that still use the old keys.
-- **The `koe-fetch` usage and messages name `sayamaapps.koe.*`.** The exit
-  codes are unchanged.
-
-### Removed
-
-- **`Plugin::$transport` and `Plugin::$defer`.** Public static test switches,
-  not part of the documented API. The same closures are optional arguments of
-  `Plugin::refresh()` and `Plugin::reviews()`.
+- **Classes are in the namespace `Sayamaapps\Koe`.** The old `Koe\` names are
+  aliases and keep working until the next major version.
+- **`koe_option()` is deprecated.** Use `Sayamaapps\Koe\Options::get()`. The
+  function keeps working and raises no notice.
+- **`Plugin::refresh()` and `Plugin::reviews()` take the HTTP client and the
+  refresh runner as optional arguments.** Without them the behaviour is as
+  before. `Plugin::$transport` and `Plugin::$defer` are deprecated; they still
+  work.
+- **The site logic is in `Sayamaapps\Koe\Site`.** The site methods return the
+  same values.
 
 ### Fixed
 
-- **The default snippet raises no deprecation** in debug mode when the
-  title and logo are set with the new option keys.
+- **`curl_close()` is no longer called.** It has done nothing since PHP 8.0,
+  and PHP 8.5 reports it as deprecated.
+
+### Planned for the next major version
+
+- **Option keys `sayamaapps.koe.<name>`.** They replace `koe.<name>`, which is
+  then no longer read. Sites must rename their keys with the update. Until
+  then `Options::PREFIX` stays `koe.`.
+- **Translation keys `sayamaapps.koe.<key>`** replace `koe.<key>`.
+- **Removal** of the `Koe\` aliases, `koe_option()`, `Plugin::$transport` and
+  `Plugin::$defer`.
 
 ## [2.2.1] — 2026-10-26
 
