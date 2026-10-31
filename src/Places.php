@@ -205,7 +205,7 @@ class Places
 		return [$entry, $message];
 	}
 
-	/** `name` is "places/<place>/reviews/<id>"; the id is what koe.approved lists. Null when empty. */
+	/** `name` is "places/<place>/reviews/<id>"; the id is what the `approved` option lists. Null when empty. */
 	private static function reviewId(string $name): string|null
 	{
 		$slash = strrpos($name, '/');

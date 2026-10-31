@@ -464,6 +464,15 @@ final class KirbyTest extends TestCase
 		$this->assertSame([], $this->queue, 'koe.active = "yes": nothing fetched');
 	}
 
+	public function testNewOptionNamesSwitchTheModuleOn(): void
+	{
+		$this->fill(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
+		[$r, $html] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
+		$this->assertTrue($r !== null && trim($html) !== '', 'sayamaapps.koe.* switches the module on and shows the reviews');
+		[$r] = $this->render(['sayamaapps.koe.active' => false, 'koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
+		$this->assertNull($r, 'sayamaapps.koe.active = false wins over the 2.3 koe.active = true');
+	}
+
 	public function testWithoutPlaceIdOrKeyNothingIsFetchedAndDebugModeSaysWhy(): void
 	{
 		$this->logged();

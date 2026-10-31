@@ -6,7 +6,7 @@ use Sayamaapps\Koe\Site;
 return [
 	/**
 	 * Overall rating, count and the selected reviews (possibly none), or
-	 * null (= show nothing: switched off, no `koe.placeId`, no key,
+	 * null (= show nothing: switched off, no place id, no key,
 	 * nothing cached yet — then the reviews are fetched after this
 	 * response — or a place without rating; the debug log says why).
 	 *
@@ -25,7 +25,7 @@ return [
 	},
 
 	/**
-	 * Address of the Google profile from `koe.placeId`, or null (then no
+	 * Address of the Google profile from the `placeId` option, or null (then no
 	 * profile link and no tile).
 	 */
 	'koeProfileUrl' => function (): string|null {

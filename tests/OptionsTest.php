@@ -8,8 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Sayamaapps\Koe\Options;
 
 /**
- * Options are read as `koe.<key>`. Nothing else is read: a key with another
- * prefix is ignored, and reading an option raises no notice in debug mode.
+ * Options are read as `sayamaapps.koe.<key>`, with the 2.3 names `koe.<key>`
+ * as fallback (OptionsPrefixTest). Reading an option raises no notice in debug mode.
  */
 #[CoversClass(Options::class)]
 final class OptionsTest extends TestCase
@@ -52,19 +52,6 @@ final class OptionsTest extends TestCase
 			Assert::assertSame('ChIJNew', Options::placeId($kirby));
 			Assert::assertSame(3, Options::get($kirby, 'minRating', 3), 'a missing option gives the default at the read');
 			Assert::assertNull(Options::get($kirby, 'logo'), 'a missing option without default is null');
-		} finally {
-			App::destroy();
-			Dir::remove($tmp);
-		}
-	}
-
-	public function testOtherPrefixIsNotRead(): void
-	{
-		[$kirby, $tmp] = $this->app(['sayamaapps.koe.placeId' => 'ChIJOther', 'debug' => true]);
-		try {
-			[$placeId, $deprecations] = $this->collectDeprecations(fn () => Options::placeId($kirby));
-			Assert::assertNull($placeId, 'the next major version reads sayamaapps.koe.*, not this one');
-			Assert::assertSame([], $deprecations, 'no notice in debug mode');
 		} finally {
 			App::destroy();
 			Dir::remove($tmp);

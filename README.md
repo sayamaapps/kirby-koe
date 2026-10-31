@@ -19,7 +19,7 @@ Koe shows a business's Google rating, its review count and a few selected review
 
 - PHP 8.2–8.5 with `mbstring`; `curl` recommended. Outgoing HTTPS to `places.googleapis.com` and `*.googleusercontent.com`.
 - Kirby 5 with a writable cache directory (`site/cache/` by default).
-- A Google Cloud project with **Places API (New)** enabled and an API key restricted to that API. Use one project and key per site, and cap the daily quota: a fetch is one request, so 30 per day is enough at any `koe.cacheHours`.
+- A Google Cloud project with **Places API (New)** enabled and an API key restricted to that API. Use one project and key per site, and cap the daily quota: a fetch is one request, so 30 per day is enough at any `sayamaapps.koe.cacheHours`.
 
 ## Installation
 
@@ -43,12 +43,12 @@ Ignore `site/cache/` in git too, and leave it out of backups.
 
 ```php
 return [
-    'koe.active'  => true,
-    'koe.placeId' => 'ChIJ…',   // from koe-fetch, see below
+    'sayamaapps.koe.active'  => true,
+    'sayamaapps.koe.placeId' => 'ChIJ…',   // from koe-fetch, see below
 ];
 ```
 
-Keep the key out of git: set `koe.key` in a file your deploy writes, or the environment variable `GOOGLE_PLACES_API_KEY` on the web server.
+Keep the key out of git: set `sayamaapps.koe.key` in a file your deploy writes, or the environment variable `GOOGLE_PLACES_API_KEY` on the web server.
 
 **Show** the reviews in a template:
 
@@ -80,9 +80,9 @@ $r = site()->koeReviews();   // null: show nothing
 
 ## Options
 
-Keys are `koe.<name>`, written flat (`'koe.active' => true`) or grouped (`'koe' => ['active' => true]`). `null` means "not set".
+Keys are `sayamaapps.koe.<name>`, written flat (`'sayamaapps.koe.active' => true`). The names of 2.3 (`koe.<name>`) still work, see [Names of earlier versions](#names-of-earlier-versions). `null` means "not set".
 
-| Option | Default | Description |
+| Option (after `sayamaapps.koe.`) | Default | Description |
 |---|---|---|
 | `active` | `false` | Master switch. Only `true` turns Koe on; otherwise nothing is shown and nothing is fetched. |
 | `placeId` | `null` | Required. The Google place id, from `koe-fetch`. If Google answers for another id, nothing is kept. |
@@ -104,13 +104,14 @@ Changing `placeId`, `language`, `cacheHours` or a selection rule makes the next 
 
 | Name | Now | Notes |
 |---|---|---|
+| `koe.<option>` in `config.php` | `sayamaapps.koe.<option>` | Still read as fallback, without notice. If both are set, the new one wins. Rename the keys in your site config. |
 | `Koe\*` classes | `Sayamaapps\Koe\*` | Class aliases, loaded with the plugin. |
 | `koe_option($key, $default)` | `Sayamaapps\Koe\Options::get(kirby(), $key, $default)` | Deprecated. Keeps working and raises no notice. |
 | `Koe\PlacesException` | unchanged | Not an alias: the exception is declared under this name. |
 
 ## Planned for the next major version
 
-Option keys `sayamaapps.koe.<name>` will replace `koe.<name>`, which is then no longer read. Translation keys `sayamaapps.koe.<key>` already work and replace `koe.<key>`, which is then removed. The names above will be removed. Sites must rename their option keys with that update.
+The option names `koe.<name>` are read until the next major version, then no longer. Translation keys `koe.<key>` are removed then too; `sayamaapps.koe.<key>` stays. The names above will be removed. Sites must rename their option keys with that update.
 
 Tests: `composer test`; all checks: `composer ci` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
 
@@ -121,7 +122,7 @@ The Places client (`Sayamaapps\Koe\Places`, with its own transport: curl, or str
 ## Privacy
 
 - **No request from the visitor's browser.** No script, embed, font or image comes from Google. Profile pictures and the optional "Google Maps" logo are served from your site; Google opens only when a visitor clicks a link.
-- **Cache only.** Reviews and pictures stay in Kirby's cache for `koe.cacheHours` at most, then they are fetched anew. Nothing else from Google is kept. The plugin sets no cookies and uses no browser storage.
+- **Cache only.** Reviews and pictures stay in Kirby's cache for `sayamaapps.koe.cacheHours` at most, then they are fetched anew. Nothing else from Google is kept. The plugin sets no cookies and uses no browser storage.
 
 See [PRIVACY.md](PRIVACY.md) (English) and [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md) (German text for privacy policies). They are not legal advice.
 
