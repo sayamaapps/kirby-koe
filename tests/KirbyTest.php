@@ -399,6 +399,15 @@ final class KirbyTest extends TestCase
 		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-set-after-boot', $this->calls[0]['headers'] ?? [], true), 'key from $_SERVER at fetch time');
 	}
 
+	public function testNewOptionNamesSwitchTheModuleOn(): void
+	{
+		$this->fill(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
+		[$r, $html] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
+		$this->assertTrue($r !== null && trim($html) !== '', 'sayamaapps.koe.* switches the module on and shows the reviews');
+		[$r] = $this->render(['sayamaapps.koe.active' => false, 'koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
+		$this->assertNull($r, 'sayamaapps.koe.active = false wins over the 2.3 koe.active = true');
+	}
+
 	public function testNoticeIsWordedFromTheOptions(): void
 	{
 		$this->answer = ['id' => 'ChIJExample', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => [$this->review('Notice', '-3 days', null, 5, 'id-notice')]];
@@ -462,15 +471,6 @@ final class KirbyTest extends TestCase
 		[$r] = $this->render(['koe.active' => 'yes'] + $this->on());
 		$this->assertNull($r, 'koe.active = "yes" must not switch on');
 		$this->assertSame([], $this->queue, 'koe.active = "yes": nothing fetched');
-	}
-
-	public function testNewOptionNamesSwitchTheModuleOn(): void
-	{
-		$this->fill(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
-		[$r, $html] = $this->render(['sayamaapps.koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
-		$this->assertTrue($r !== null && trim($html) !== '', 'sayamaapps.koe.* switches the module on and shows the reviews');
-		[$r] = $this->render(['sayamaapps.koe.active' => false, 'koe.active' => true, 'sayamaapps.koe.placeId' => 'ChIJExample', 'sayamaapps.koe.key' => self::KEY]);
-		$this->assertNull($r, 'sayamaapps.koe.active = false wins over the 2.3 koe.active = true');
 	}
 
 	public function testWithoutPlaceIdOrKeyNothingIsFetchedAndDebugModeSaysWhy(): void
