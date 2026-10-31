@@ -27,18 +27,6 @@ final class OptionsPrefixTest extends TestCase
 		return [$kirby, $tmp];
 	}
 
-	/** Runs $check with a Kirby app with these options, then removes the app and its directory. */
-	private function with(array $options, callable $check): mixed
-	{
-		[$kirby, $tmp] = $this->app($options);
-		try {
-			return $check($kirby);
-		} finally {
-			App::destroy();
-			Dir::remove($tmp);
-		}
-	}
-
 	/** Runs $read and returns its result and every deprecation it triggered. */
 	private function collectDeprecations(callable $read): array
 	{
@@ -56,6 +44,23 @@ final class OptionsPrefixTest extends TestCase
 			restore_error_handler();
 		}
 		return [$result, $seen];
+	}
+
+	public function testDefaultAppliesWhenNeitherIsSet(): void
+	{
+		$this->with([], function (App $kirby): void {
+			Assert::assertSame(7, Options::get($kirby, 'minRating', 7), 'the default applies');
+			Assert::assertNull(Options::placeId($kirby));
+		});
+	}
+
+	public function testLegacyHelperReadsTheNewName(): void
+	{
+		require_once dirname(__DIR__) . '/legacy.php';
+
+		[$logo, $deprecations] = $this->with(['sayamaapps.koe.logo' => 'new.png', 'debug' => true], fn () => $this->collectDeprecations(fn () => koe_option('logo')));
+		Assert::assertSame('new.png', $logo, 'koe_option() reads sayamaapps.koe.logo');
+		Assert::assertSame([], $deprecations, 'no notice');
 	}
 
 	public function testNewNameIsRead(): void
@@ -80,14 +85,6 @@ final class OptionsPrefixTest extends TestCase
 		});
 	}
 
-	public function testDefaultAppliesWhenNeitherIsSet(): void
-	{
-		$this->with([], function (App $kirby): void {
-			Assert::assertSame(7, Options::get($kirby, 'minRating', 7), 'the default applies');
-			Assert::assertNull(Options::placeId($kirby));
-		});
-	}
-
 	public function testSetKeyNamesTheSpellingTheSiteUses(): void
 	{
 		$names = [
@@ -102,12 +99,15 @@ final class OptionsPrefixTest extends TestCase
 		}
 	}
 
-	public function testLegacyHelperReadsTheNewName(): void
+	/** Runs $check with a Kirby app with these options, then removes the app and its directory. */
+	private function with(array $options, callable $check): mixed
 	{
-		require_once dirname(__DIR__) . '/legacy.php';
-
-		[$logo, $deprecations] = $this->with(['sayamaapps.koe.logo' => 'new.png', 'debug' => true], fn () => $this->collectDeprecations(fn () => koe_option('logo')));
-		Assert::assertSame('new.png', $logo, 'koe_option() reads sayamaapps.koe.logo');
-		Assert::assertSame([], $deprecations, 'no notice');
+		[$kirby, $tmp] = $this->app($options);
+		try {
+			return $check($kirby);
+		} finally {
+			App::destroy();
+			Dir::remove($tmp);
+		}
 	}
 }

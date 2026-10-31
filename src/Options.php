@@ -71,18 +71,6 @@ class Options
 	}
 
 	/**
-	 * The option name as the site spelled it, for messages: the 2.3 koe.<key>
-	 * name only when the site sets no sayamaapps.koe.<key> value for it.
-	 */
-	public static function setKey(App $kirby, string $key): string
-	{
-		if ($kirby->option(self::OPTION_PREFIX . $key) === null && $kirby->option(self::PREFIX . $key) !== null) {
-			return self::PREFIX . $key;
-		}
-		return self::OPTION_PREFIX . $key;
-	}
-
-	/**
 	 * The Places API key: the `key` option (a string or a closure returning one),
 	 * otherwise the environment variable GOOGLE_PLACES_API_KEY — getenv(),
 	 * then $_SERVER, read at call time (Apache's SetEnv lands there under
@@ -162,5 +150,17 @@ class Options
 			'approved'     => is_array($approved) ? array_values(array_map('strval', $approved)) : null,
 			'placeId'      => self::placeId($kirby),
 		];
+	}
+
+	/**
+	 * The option name as the site spelled it, for messages: the 2.3 koe.<key>
+	 * name only when the site sets no sayamaapps.koe.<key> value for it.
+	 */
+	public static function setKey(App $kirby, string $key): string
+	{
+		if ($kirby->option(self::OPTION_PREFIX . $key) === null && $kirby->option(self::PREFIX . $key) !== null) {
+			return self::PREFIX . $key;
+		}
+		return self::OPTION_PREFIX . $key;
 	}
 }
