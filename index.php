@@ -4,7 +4,7 @@ use Kirby\Filesystem\F;
 
 /**
  * Plugin registration for Koe (声, "voice"): Google reviews served from your
- * own server. Off by default: without `'koe.active' => true`,
+ * own server. Off by default: without `'sayamaapps.koe.active' => true`,
  * $site->koeReviews() is null and the snippet prints nothing and nothing is
  * fetched.
  *

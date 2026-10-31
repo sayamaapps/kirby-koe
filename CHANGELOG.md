@@ -12,6 +12,13 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [2.4.0] — 2026-10-31
+
+### Changed
+
+- Options are read as `sayamaapps.koe.<name>`. The 2.3 names `koe.<name>` keep working and are read without a warning. If both are set, the new one wins.
+- `Options::OPTION_PREFIX` is new. `Options::PREFIX` keeps its 2.3 value.
+
 ## [2.3.0] — 2026-10-27
 
 Nothing a site has to change. The option keys, the translation keys and the
