@@ -20,6 +20,10 @@ return [
 	'opensNewTab' => '(öffnet neuen Tab)',
 	'author.anonymous' => 'Google-Nutzer',
 
+	// Demo mode: heading without Google's name, and the label on the sample reviews.
+	'demo.title' => 'Bewertungen',
+	'demo.label' => 'Beispielbewertungen',
+
 	'notice.selection' => 'Auswahl: {criteria}.',
 	'notice.stars.exact' => '{stars} Sterne',
 	'notice.stars.min' => 'ab {stars} Sternen',

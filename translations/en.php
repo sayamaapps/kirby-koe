@@ -21,6 +21,10 @@ return [
 	'opensNewTab' => '(opens in a new tab)',
 	'author.anonymous' => 'Google user',
 
+	// Demo mode: heading without Google's name, and the label on the sample reviews.
+	'demo.title' => 'Reviews',
+	'demo.label' => 'Sample reviews',
+
 	// The notice on how the reviews shown were selected, built by Reviews::notice() from the rules in force.
 	'notice.selection' => 'Selection: {criteria}.',
 	'notice.stars.exact' => '{stars} stars',

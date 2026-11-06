@@ -24,9 +24,9 @@ class Site
 
 	/**
 	 * Reviews of the configured place, with the notice and the profile address,
-	 * or null when nothing is to be shown.
+	 * or the sample reviews in demo mode (`demo` true, no profile address), or null when nothing is to be shown.
 	 *
-	 * @return array{rating: float, count: int, placeId: string, reviews: array<int, array<string, mixed>>, limit: int, notice: string, profileUrl: string|null}|null
+	 * @return array{rating: float, count: int, placeId: ?string, reviews: array<int, array<string, mixed>>, limit: int, notice: string, profileUrl: string|null, demo: bool}|null
 	 */
 	public static function reviews(App $kirby, string|null $profileUrl): array|null
 	{
@@ -39,8 +39,11 @@ class Site
 		if ($result === null) {
 			return null;
 		}
+		$demo = Options::demo($kirby);
 		$result['notice'] = Reviews::notice($rules);
-		$result['profileUrl'] = $profileUrl;
+		// Sample reviews link to no Google profile.
+		$result['profileUrl'] = $demo ? null : $profileUrl;
+		$result['demo'] = $demo;
 		return $result;
 	}
 }

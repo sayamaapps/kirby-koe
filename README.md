@@ -13,6 +13,7 @@ Koe shows a business's Google rating, its review count and a few selected review
 - Optional approved list, so the business decides which reviews appear.
 - Google attribution built in: author with profile picture, links to the review, "Google Maps" attribution, a notice on the selection.
 - API key kept on the server; profile pictures served from your own site.
+- Demo mode with fictional sample reviews, to show the block before an API key exists.
 - English and German; no database, no cookies.
 
 ## Requirements
@@ -97,8 +98,26 @@ Keys are `sayamaapps.koe.<name>`, written flat (`'sayamaapps.koe.active' => true
 | `title` | translated | Heading of the default snippet (`Reviews on Google` / `Bewertungen auf Google`). |
 | `logo` | `null` | Path under `public/` to the official Google Maps logo. Without it, the attribution is the text "Google Maps". |
 | `language` | site language | `en` or `de`. Otherwise the site's default language, then Kirby's `locale`, then English. |
+| `demo` | `false` | `true` shows fictional sample reviews instead of the real ones, as long as no API key is set. See [Demo mode](#demo-mode). |
 
 Changing `placeId`, `language`, `cacheHours` or a selection rule makes the next view fetch anew. Kirby's `debug` option makes the error log say why nothing is shown; failed fetches are always logged. Other cache drivers work too, e.g. `'sayamaapps.koe.cache' => ['type' => 'apcu']`.
+
+## Demo mode
+
+Shows the review block to a client before a Google Cloud project and an API key exist.
+
+```php
+// site/config/config.php
+return [
+    'sayamaapps.koe.active' => true,
+    'sayamaapps.koe.demo'   => true,
+];
+```
+
+- Six fictional German sample reviews (3 to 5 stars, dated relative to today), rating 4.7 from 47 reviews. They have the form of real ones, so the selection rules, `approved` (ids `demo-1` to `demo-6`) and your own snippet work unchanged. With the default rules three are shown.
+- No request, no key, no place id needed. Nothing is read from or written to the cache, and the page is kept out of Kirby's page cache, so sample data is never served as real data.
+- **Attribution:** sample reviews are not from Google, so the default snippet shows nothing of Google: no logo, no "on Google", no profile or review links, heading `Reviews` / `Bewertungen` (unless `title` is set). Instead it prints the label `Sample reviews` / `Beispielbewertungen` (`<p class="koe-demo">`; own text with `snippet('koe/reviews', ['demoLabel' => '…'])`). `$site->koeReviews()['demo']` is `true`; your own snippet must do the same.
+- **Going live:** set `placeId` and the key (`key` option or `GOOGLE_PLACES_API_KEY`). **The key wins:** as soon as one is set, `demo` is ignored (the debug log says so) and the real reviews are fetched. Then remove `demo` from the config.
 
 ## Names of earlier versions
 

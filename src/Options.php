@@ -57,6 +57,24 @@ class Options
 	}
 
 	/**
+	 * Whether the demo mode is in force: the `demo` option is `true` and no
+	 * API key is set. A key always wins, so a site that has gone live can
+	 * never show sample reviews, even with `demo` left on (the debug log says
+	 * so).
+	 */
+	public static function demo(App $kirby): bool
+	{
+		if (self::get($kirby, 'demo', false) !== true) {
+			return false;
+		}
+		if (self::key($kirby) !== null) {
+			self::debugLog($kirby, self::setKey($kirby, 'demo') . ' is ignored: an API key is set');
+			return false;
+		}
+		return true;
+	}
+
+	/**
 	 * Reads `sayamaapps.koe.<key>`, then `koe.<key>` (2.3). The 2.3 name is
 	 * read without a notice. Returns $default when neither is set.
 	 */
