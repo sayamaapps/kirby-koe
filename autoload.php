@@ -7,6 +7,7 @@
  */
 return [
 	'koe\\placesexception'            => 'src/PlacesException.php',
+	'sayamaapps\\koe\\demo'           => 'src/Demo.php',
 	'sayamaapps\\koe\\fetch'          => 'src/Fetch.php',
 	'sayamaapps\\koe\\i18n'           => 'src/I18n.php',
 	'sayamaapps\\koe\\options'        => 'src/Options.php',

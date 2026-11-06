@@ -12,13 +12,16 @@ return [
 	 *
 	 *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…',
 	 *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url', 'avatar'], …],
-	 *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…']
+	 *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…', 'demo' => false]
 	 *
 	 * `limit` is the configured maximum: a snippet fills the remaining
 	 * slots with a "read all on Google" tile when count(reviews) < limit.
 	 * `notice` tells visitors how the reviews were selected and sorted,
 	 * worded from the options in force (plain text, in the snippet's
 	 * language); a snippet that lists single reviews prints it.
+	 * `demo` is true for the sample reviews of the `demo` option: then
+	 * there is no profile link, and a snippet must not show Google's name
+	 * or logo but say that these are samples.
 	 */
 	'koeReviews' => function (): array|null {
 		return Site::reviews($this->kirby(), $this->koeProfileUrl());

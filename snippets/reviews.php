@@ -22,8 +22,13 @@
  * markup a business publishes about itself. No CSS: the grid belongs to the
  * site (classes koe-*).
  *
+ * Demo mode (`demo` option, no key set): the sample reviews are shown
+ * without anything of Google (no logo, no "on Google", no links) and with
+ * the label "Sample reviews" (class koe-demo; text from $demoLabel).
+ *
  * @var string|null $title
  * @var string|null $logo  path under public/, e.g. assets/GoogleMaps_Logo_Gray.svg
+ * @var string|null $demoLabel  label of the sample reviews in demo mode
  */
 $r = site()->koeReviews();
 if ($r === null) {
@@ -31,8 +36,10 @@ if ($r === null) {
 }
 $t = fn (string $key, array $values = []) => \Sayamaapps\Koe\I18n::t($key, $values);
 $profile = $r['profileUrl'];
-$title ??= \Sayamaapps\Koe\Options::get(kirby(), 'title') ?? $t('title');
+$demo = $r['demo'] ?? false;
+$title ??= \Sayamaapps\Koe\Options::get(kirby(), 'title') ?? $t($demo ? 'demo.title' : 'title');
 $logo ??= \Sayamaapps\Koe\Options::get(kirby(), 'logo');
+$demoLabel ??= $t('demo.label');
 $tab = '<span class="sr-only"> ' . esc($t('opensNewTab')) . '</span>';
 $attribution = $logo
 	? '<img class="koe-logo" src="' . esc(url($logo), 'attr') . '" width="98" height="18" alt="Google Maps">'
@@ -45,8 +52,15 @@ $viewProfile = $profile
 	<h2 id="koe-title"><?= esc($title) ?></h2>
 	<p class="koe-rating">
 		<strong><?= esc($t('ratingOutOf', ['rating' => \Sayamaapps\Koe\I18n::number($r['rating'])])) ?></strong>
+		<?php if ($demo) : ?>
+		<span><?= esc($t('reviewsCount', ['count' => $r['count']])) ?></span>
+		<?php else : ?>
 		<span><?= esc($t('countOn', ['count' => $r['count']])) ?> <?= $attribution ?><?= $viewProfile ?></span>
+		<?php endif ?>
 	</p>
+	<?php if ($demo) : ?>
+	<p class="koe-demo"><?= esc($demoLabel) ?></p>
+	<?php endif ?>
 	<?php if ($r['reviews'] !== []) : ?>
 	<ul class="koe-list">
 		<?php foreach ($r['reviews'] as $review) : ?>

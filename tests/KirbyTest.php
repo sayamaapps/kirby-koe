@@ -23,7 +23,7 @@ use Sayamaapps\Koe\Plugin;
  * already filled, so no request leaves the test.
  *   vendor/bin/phpunit
  *
- * One test method per case makes this class large on purpose (31 methods, 17 public).
+ * One test method per case makes this class large on purpose (33 methods, 19 public).
  * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  * @SuppressWarnings(PHPMD.TooManyMethods)
  * @SuppressWarnings(PHPMD.TooManyPublicMethods)
@@ -306,6 +306,30 @@ final class KirbyTest extends TestCase
 		$this->assertTrue(str_contains($html, '<img class="koe-logo" src="http://example.invalid/assets/logo.svg"'), 'logo from the option');
 	}
 
+	public function testDemoShowsSampleReviewsWithoutKeyRequestOrCache(): void
+	{
+		$demo = ['koe.active' => true, 'sayamaapps.koe.demo' => true, 'koe.language' => 'de'];
+		[$r, $html] = $this->render($demo);
+		$this->assertNotNull($r, 'demo without key and without place id shows reviews');
+		$this->assertTrue($r['demo'], 'koeReviews() says demo');
+		$this->assertNull($r['profileUrl'], 'no Google profile in demo');
+		$this->assertSame(['demo-1', 'demo-2', 'demo-4'], array_column($r['reviews'], 'id'), 'the default rules select from the samples');
+		$this->assertStringContainsString('<p class="koe-demo">Beispielbewertungen</p>', $html, 'demo label rendered');
+		$this->assertStringContainsString('<h2 id="koe-title">Bewertungen</h2>', $html, 'heading without Google');
+		$this->assertStringNotContainsString('Google', $html, 'no Google branding in demo');
+		$this->assertStringNotContainsString('href=', $html, 'no links in demo');
+		$this->assertStringContainsString('Auswahl:', $html, 'selection notice as live');
+		$this->assertSame([[], [], 0], [$this->calls, $this->queue, $this->cacheFiles()], 'no request, no refresh, nothing cached');
+		[, $own] = $this->render($demo + ['koe.placeId' => 'ChIJExample'], ['demoLabel' => 'Muster']);
+		$this->assertStringContainsString('<p class="koe-demo">Muster</p>', $own, 'label from the snippet variable');
+		$this->assertSame(0, $this->cacheFiles(), 'demo with place id: still nothing cached');
+		[$live] = $this->firstView($this->on());
+		$this->assertNull($live, 'switched to live: no sample data is served from the cache');
+		$this->assertCount(1, $this->queue, 'switched to live: the first view fetches');
+		[$off] = $this->render(['sayamaapps.koe.demo' => true]);
+		$this->assertNull($off, 'demo needs active');
+	}
+
 	public function testEmptyApprovalAndNestedSpelling(): void
 	{
 		$none = ['koe.approved' => []] + $this->on();
@@ -397,6 +421,23 @@ final class KirbyTest extends TestCase
 		Plugin::reviews($kirby, Options::rules($kirby), $this->transport(), $this->queueing());
 		$this->drain();
 		$this->assertTrue(in_array('X-Goog-Api-Key: AIza-set-after-boot', $this->calls[0]['headers'] ?? [], true), 'key from $_SERVER at fetch time');
+	}
+
+	public function testKeyWinsOverDemo(): void
+	{
+		$this->logged();
+		$options = $this->on() + ['koe.demo' => true, 'debug' => true];
+		[$first] = $this->firstView($options);
+		$this->assertNull($first, 'key set: first view behaves as live (nothing cached yet)');
+		$this->assertCount(1, $this->queue, 'key set: the refresh is queued');
+		$this->assertStringContainsString('koe.demo is ignored: an API key is set', $this->logged(), 'debug log says why');
+		$this->drain();
+		[$r, $html] = $this->render($options);
+		$this->assertFalse($r['demo'], 'key set: no demo');
+		$this->assertNotContains('demo-1', array_column($r['reviews'], 'id'), 'real reviews');
+		$this->assertNotNull($r['profileUrl']);
+		$this->assertStringNotContainsString('koe-demo', $html);
+		$this->assertStringContainsString('Google Maps', $html, 'live attribution');
 	}
 
 	public function testNewOptionNamesSwitchTheModuleOn(): void

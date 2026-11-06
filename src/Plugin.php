@@ -93,6 +93,27 @@ class Plugin
 	}
 
 	/**
+	 * The sample reviews (Demo) through the same selection as cached ones.
+	 * Nothing is read from or written to the cache, so sample data can never
+	 * be served as real data, and the page is kept out of Kirby's page cache
+	 * so it cannot outlive the switch to live.
+	 *
+	 * @return array{rating: float, count: int, placeId: ?string, reviews: array<int, array<string, mixed>>, limit: int}
+	 */
+	private static function demo(App $kirby, array $rules): array
+	{
+		$kirby->response()->cache(false);
+		$data = Demo::data(self::today(), $rules['placeId'] ?? null);
+		return [
+			'rating'  => $data['rating'],
+			'count'   => $data['count'],
+			'placeId' => $data['placeId'],
+			'reviews' => Reviews::select($data['reviews'], $rules, self::today()),
+			'limit'   => (int)$rules['maxCount'],
+		];
+	}
+
+	/**
 	 * Fetches the reviews into the cache. Failures go to the error log (also
 	 * outside debug mode: they need someone to act), the key scrubbed.
 	 *
@@ -126,16 +147,19 @@ class Plugin
 	}
 
 	/**
-	 * Rating, count and the selected reviews, or null (= show nothing: no
+	 * Rating, count and the selected reviews (the sample ones in demo mode; placeId may then be null), or null (= show nothing: no
 	 * place id, no key, nothing cached yet, or a place without rating).
 	 *
 	 * @param $transport passed on to refresh() (null = self::$transport, else the real one)
 	 * @param $defer runs the refresh job instead of deferring it after the response (null = self::$defer, else the server way)
-	 * @return array{rating: float, count: int, placeId: string, reviews: array<int, array<string, mixed>>, limit: int}|null
+	 * @return array{rating: float, count: int, placeId: ?string, reviews: array<int, array<string, mixed>>, limit: int}|null
 	 */
 	public static function reviews(App $kirby, array $rules, Closure|null $transport = null, Closure|null $defer = null): array|null
 	{
 		$defer ??= self::$defer;
+		if (Options::demo($kirby)) {
+			return self::demo($kirby, $rules);
+		}
 		$placeId = $rules['placeId'] ?? null;
 		if ($placeId === null) {
 			Options::debugLog($kirby, 'nothing shown: ' . Options::setKey($kirby, 'placeId') . ' is not set (koe-fetch shows the id)');

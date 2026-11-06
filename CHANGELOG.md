@@ -12,6 +12,14 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## [2.5.0] — 2026-11-06
+
+### Added
+
+- **Demo mode** (`sayamaapps.koe.demo => true`): fictional sample reviews without key, request or cache, through the same selection rules and snippet. The default snippet shows them without any Google branding and with the label "Sample reviews" (`koe-demo`, snippet variable `$demoLabel`). An API key always wins over `demo`.
+- `$site->koeReviews()` returns `demo` (`true` for sample reviews); `placeId` may then be null.
+- Translation keys `demo.title` and `demo.label`.
+
 ## [2.4.0] — 2026-10-31
 
 ### Changed

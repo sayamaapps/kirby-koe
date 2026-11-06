@@ -8,6 +8,7 @@ return [
 	'active'       => null,
 	'approved'     => null,
 	'cacheHours'   => null,
+	'demo'         => null,
 	'key'          => null,
 	'language'     => null,
 	'logo'         => null,
