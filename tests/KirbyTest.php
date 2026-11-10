@@ -344,6 +344,17 @@ final class KirbyTest extends TestCase
 		$this->assertTrue(str_contains($html, '<img class="koe-logo" src="http://example.invalid/assets/logo.svg"'), 'logo from the option');
 	}
 
+	public function testDemoModeSaysTheSampleReviewsAreInvented(): void
+	{
+		$demo = ['koe.active' => true, 'sayamaapps.koe.demo' => true, 'sayamaapps.koe.authenticityNotice' => 'We verify every reviewer.'];
+		[$r, $html] = $this->render($demo);
+		$this->assertSame('These sample reviews are invented and do not come from real customers.', $r['authenticityNotice'], 'demo: sample text, the override does not apply');
+		$this->assertStringContainsString('<p class="koe-authenticity">These sample reviews are invented and do not come from real customers.</p>', $html);
+		$this->assertStringNotContainsString('Google', $html, 'no Google branding in demo');
+		[, $german] = $this->render($demo + ['koe.language' => 'de']);
+		$this->assertStringContainsString('<p class="koe-authenticity">Diese Beispielbewertungen sind erfunden und stammen nicht von echten Kundinnen und Kunden.</p>', $german);
+	}
+
 	public function testDemoShowsSampleReviewsWithoutKeyRequestOrCache(): void
 	{
 		$demo = ['koe.active' => true, 'sayamaapps.koe.demo' => true, 'koe.language' => 'de'];
@@ -366,17 +377,6 @@ final class KirbyTest extends TestCase
 		$this->assertCount(1, $this->queue, 'switched to live: the first view fetches');
 		[$off] = $this->render(['sayamaapps.koe.demo' => true]);
 		$this->assertNull($off, 'demo needs active');
-	}
-
-	public function testDemoModeSaysTheSampleReviewsAreInvented(): void
-	{
-		$demo = ['koe.active' => true, 'sayamaapps.koe.demo' => true, 'sayamaapps.koe.authenticityNotice' => 'We verify every reviewer.'];
-		[$r, $html] = $this->render($demo);
-		$this->assertSame('These sample reviews are invented and do not come from real customers.', $r['authenticityNotice'], 'demo: sample text, the override does not apply');
-		$this->assertStringContainsString('<p class="koe-authenticity">These sample reviews are invented and do not come from real customers.</p>', $html);
-		$this->assertStringNotContainsString('Google', $html, 'no Google branding in demo');
-		[, $german] = $this->render($demo + ['koe.language' => 'de']);
-		$this->assertStringContainsString('<p class="koe-authenticity">Diese Beispielbewertungen sind erfunden und stammen nicht von echten Kundinnen und Kunden.</p>', $german);
 	}
 
 	public function testEmptyApprovalAndNestedSpelling(): void

@@ -40,20 +40,6 @@ class Reviews
 	/** Longer texts are cut at a word boundary. */
 	public const TRUNCATE = 280;
 
-	/** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, placeId:?string} */
-	public static function defaultRules(): array
-	{
-		return [
-			'minRating'    => self::MIN_RATING,
-			'minLength'    => self::MIN_LENGTH,
-			'maxAgeMonths' => self::MAX_AGE_MONTHS,
-			'maxCount'     => self::MAX_COUNT,
-			'truncate'     => self::TRUNCATE,
-			'approved'     => null,
-			'placeId'      => null,
-		];
-	}
-
 	/**
 	 * The notice on whether and how the business checks that the reviews come
 	 * from people who used its services (section 5b (3) UWG). Plain text in the
@@ -66,6 +52,20 @@ class Reviews
 	public static function authenticityNotice(mixed $custom): string
 	{
 		return is_string($custom) && trim($custom) !== '' ? trim($custom) : I18n::t('authenticity');
+	}
+
+	/** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, placeId:?string} */
+	public static function defaultRules(): array
+	{
+		return [
+			'minRating'    => self::MIN_RATING,
+			'minLength'    => self::MIN_LENGTH,
+			'maxAgeMonths' => self::MAX_AGE_MONTHS,
+			'maxCount'     => self::MAX_COUNT,
+			'truncate'     => self::TRUNCATE,
+			'approved'     => null,
+			'placeId'      => null,
+		];
 	}
 
 	/**

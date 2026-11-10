@@ -24,15 +24,6 @@ final class PackageTest extends TestCase
 		return str_contains($out, 'export-ignore: set');
 	}
 
-	public function testGermanPrivacyTextIsShippedInThePackage(): void
-	{
-		$file = dirname(__DIR__) . '/docs/DATENSCHUTZ.md';
-		Assert::assertFileExists($file);
-		foreach (['docs', 'docs/DATENSCHUTZ.md', 'PRIVACY.md'] as $path) {
-			Assert::assertFalse($this->exportIgnored($path), "$path must not be export-ignored: the README links to it");
-		}
-	}
-
 	/** Whether the path ends up in a dist archive: it exists and neither it nor a parent folder is export-ignored. */
 	private function shipped(string $path): bool
 	{
@@ -45,6 +36,37 @@ final class PackageTest extends TestCase
 			}
 		}
 		return true;
+	}
+
+	public function testGermanPrivacyTextIsShippedInThePackage(): void
+	{
+		$file = dirname(__DIR__) . '/docs/DATENSCHUTZ.md';
+		Assert::assertFileExists($file);
+		foreach (['docs', 'docs/DATENSCHUTZ.md', 'PRIVACY.md'] as $path) {
+			Assert::assertFalse($this->exportIgnored($path), "$path must not be export-ignored: the README links to it");
+		}
+	}
+
+	public function testPrivacyTextNamesTheRealDataFlowsAndCurrentOptionNames(): void
+	{
+		$text = (string)file_get_contents(dirname(__DIR__) . '/docs/DATENSCHUTZ.md');
+		$flat = preg_replace('/\s+/', ' ', $text);
+		foreach (['Places', 'Zwischenspeicher', 'Profilbild', 'Internetadresse unseres Servers', 'googleusercontent'] as $needle) {
+			Assert::assertStringContainsString($needle, $flat, "the privacy text must mention: $needle");
+		}
+		foreach (['cacheHours', 'key', 'authenticityNotice'] as $option) {
+			Assert::assertDoesNotMatchRegularExpression('/(?<![\w.])koe\.' . $option . '\b/', $flat, "option $option is named sayamaapps.koe.$option since 2.4");
+		}
+		Assert::assertStringContainsString('sayamaapps.koe.cacheHours', $flat);
+		Assert::assertStringContainsString('nicht prüfen, ob die Verfasser unsere Leistungen tatsächlich in Anspruch genommen haben', $flat, 'the text names the review notice the snippet prints');
+	}
+
+	public function testReadmeLinksBothPrivacyTexts(): void
+	{
+		$readme = (string)file_get_contents(dirname(__DIR__) . '/README.md');
+		Assert::assertStringContainsString('(docs/DATENSCHUTZ.md)', $readme);
+		Assert::assertStringContainsString('(PRIVACY.md)', $readme);
+		Assert::assertFileExists(dirname(__DIR__) . '/PRIVACY.md');
 	}
 
 	public function testRelativeLinksInShippedMarkdownResolveToShippedFiles(): void
@@ -70,27 +92,5 @@ final class PackageTest extends TestCase
 				Assert::assertTrue($this->shipped($target), "$doc links to $link, which is not in the dist archive ($target)");
 			}
 		}
-	}
-
-	public function testReadmeLinksBothPrivacyTexts(): void
-	{
-		$readme = (string)file_get_contents(dirname(__DIR__) . '/README.md');
-		Assert::assertStringContainsString('(docs/DATENSCHUTZ.md)', $readme);
-		Assert::assertStringContainsString('(PRIVACY.md)', $readme);
-		Assert::assertFileExists(dirname(__DIR__) . '/PRIVACY.md');
-	}
-
-	public function testPrivacyTextNamesTheRealDataFlowsAndCurrentOptionNames(): void
-	{
-		$text = (string)file_get_contents(dirname(__DIR__) . '/docs/DATENSCHUTZ.md');
-		$flat = preg_replace('/\s+/', ' ', $text);
-		foreach (['Places', 'Zwischenspeicher', 'Profilbild', 'Internetadresse unseres Servers', 'googleusercontent'] as $needle) {
-			Assert::assertStringContainsString($needle, $flat, "the privacy text must mention: $needle");
-		}
-		foreach (['cacheHours', 'key', 'authenticityNotice'] as $option) {
-			Assert::assertDoesNotMatchRegularExpression('/(?<![\w.])koe\.' . $option . '\b/', $flat, "option $option is named sayamaapps.koe.$option since 2.4");
-		}
-		Assert::assertStringContainsString('sayamaapps.koe.cacheHours', $flat);
-		Assert::assertStringContainsString('nicht prüfen, ob die Verfasser unsere Leistungen tatsächlich in Anspruch genommen haben', $flat, 'the text names the review notice the snippet prints');
 	}
 }
