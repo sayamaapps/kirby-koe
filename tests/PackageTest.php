@@ -33,6 +33,45 @@ final class PackageTest extends TestCase
 		}
 	}
 
+	/** Whether the path ends up in a dist archive: it exists and neither it nor a parent folder is export-ignored. */
+	private function shipped(string $path): bool
+	{
+		if (!file_exists(dirname(__DIR__) . '/' . $path)) {
+			return false;
+		}
+		for ($part = $path; $part !== '.'; $part = dirname($part)) {
+			if ($this->exportIgnored($part)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public function testRelativeLinksInShippedMarkdownResolveToShippedFiles(): void
+	{
+		$root = dirname(__DIR__);
+		$docs = array_merge(['README.md', 'PRIVACY.md'], array_map(fn (string $f) => 'docs/' . basename($f), glob($root . '/docs/*.md') ?: []));
+		foreach ($docs as $doc) {
+			Assert::assertTrue($this->shipped($doc), "$doc is meant to be shipped");
+			preg_match_all('/\]\(([^)\s]+)\)/', (string)file_get_contents($root . '/' . $doc), $matches);
+			foreach ($matches[1] as $link) {
+				if (preg_match('~^([a-z][a-z0-9+.-]*:|#|//)~i', $link)) {
+					continue;
+				}
+				$target = [];
+				foreach (explode('/', dirname($doc) . '/' . explode('#', $link)[0]) as $segment) {
+					if ($segment === '..') {
+						array_pop($target);
+					} elseif ($segment !== '' && $segment !== '.') {
+						$target[] = $segment;
+					}
+				}
+				$target = implode('/', $target);
+				Assert::assertTrue($this->shipped($target), "$doc links to $link, which is not in the dist archive ($target)");
+			}
+		}
+	}
+
 	public function testReadmeLinksBothPrivacyTexts(): void
 	{
 		$readme = (string)file_get_contents(dirname(__DIR__) . '/README.md');

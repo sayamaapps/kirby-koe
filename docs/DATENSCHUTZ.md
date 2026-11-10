@@ -40,8 +40,9 @@ Die Bewertungen ruft unser Webserver über die Google-Places-Schnittstelle ab,
 wenn eine Seite sie anzeigen soll und sein Zwischenspeicher keine enthält. Dabei
 werden die Kennung unseres Google-Eintrags und eine Sprachangabe übermittelt,
 außerdem, wie bei jeder Anfrage, die Internetadresse unseres Servers und unser
-API-Schlüssel, niemals Daten unserer Website-Besucher; der Abruf erfolgt erst, nachdem die Seite
-ausgeliefert wurde. Anschließend lädt unser Server die Profilbilder der
+API-Schlüssel, niemals Daten unserer Website-Besucher. Der Abruf erfolgt, nachdem
+die Seite ausgeliefert wurde (unter PHP-FPM und LiteSpeed; auf anderen Servern
+wartet die Seite dieses einen Besuchers darauf). Anschließend lädt unser Server die Profilbilder der
 angezeigten Bewertungen vom Bildserver von Google (`googleusercontent.com`),
 ebenfalls ohne Besucherdaten und ohne Schlüssel.
 
@@ -51,8 +52,10 @@ angezeigten Bewertungen (in der Vorgabe höchstens drei) mit Anzeigename,
 Profilbild, Datum, Sternezahl, Text und Link zur Bewertung bei Google Maps.
 Weitere von Google gelieferte Bewertungen und Angaben werden sofort verworfen.
 Der Zwischenspeicher verfällt nach einer festen Haltezeit (in der Vorgabe
-24 Stunden, Option `sayamaapps.koe.cacheHours`) und wird beim nächsten Seitenaufruf danach
-gelöscht; jeder Abruf ersetzt ihn vollständig. Es gibt keine dauerhafte Kopie
+24 Stunden, Option `sayamaapps.koe.cacheHours`); die Bewertungen werden beim nächsten
+Seitenaufruf danach gelöscht, die gespeicherten Profilbilder spätestens mit dem
+nächsten Abruf ersetzt oder entfernt. Jeder Abruf ersetzt den Zwischenspeicher
+vollständig. Es gibt keine dauerhafte Kopie
 und kein Archiv, die Bewertungen liegen weder im Inhaltsverzeichnis der Website
 noch in deren Versionsverwaltung. Eine Bewertung, die Google nicht mehr liefert
 (etwa weil sie zurückgezogen wurde), verschwindet spätestens nach Ablauf der

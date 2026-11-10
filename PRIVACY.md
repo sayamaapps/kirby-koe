@@ -1,6 +1,6 @@
 # Koe: privacy notes
 
-This is an English summary of [DATENSCHUTZ.md](DATENSCHUTZ.md), the German text
+This is an English summary of [DATENSCHUTZ.md](docs/DATENSCHUTZ.md), the German text
 block for privacy policies, which is the authoritative version. Both describe
 the implementation. They are not legal advice. Each operator has to determine
 the legal basis and the wording for their own site.
@@ -38,8 +38,9 @@ after the holding time ran out), the web server sends one request to the
 Places API (New), authenticated with the site's own API key: the details of
 the configured place. The request carries the place id and a language code
 and, as any request does, the web server's IP address and the API key, never
-visitor data. It is sent after the page was delivered to that visitor,
-who sees the page without reviews; the visitors after them see the reviews.
+visitor data. It is sent after the page was delivered to that visitor (under
+PHP-FPM and LiteSpeed; elsewhere that one visitor's page waits for it). That
+visitor sees the page without reviews; the visitors after them see the reviews.
 The server then fetches the profile pictures of the reviews it keeps, from
 Google's image server (`googleusercontent.com`), without the key and without
 visitor data.
@@ -62,8 +63,9 @@ the web except the pictures at `/koe/avatar/<key>` while they are shown, and
 should be excluded from backups.
 
 Everything in the cache expires after the holding time (`sayamaapps.koe.cacheHours`,
-24 hours by default, shorter if configured) and is deleted with the next
-page view after that. Every fetch empties the cache completely before it
+24 hours by default, shorter if configured). The reviews are deleted with the
+next page view after that; the stored profile pictures are replaced or removed
+at the latest with the next fetch. Every fetch empties the cache completely before it
 writes the new answer, also when that answer contains no review text (the
 page then shows only rating and count). There is no archive: a review Google
 no longer returns — withdrawn by its author, removed by Google, pushed out by

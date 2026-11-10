@@ -135,7 +135,7 @@ return [
 
 The option names `koe.<name>` are read until the next major version, then no longer. Translation keys `koe.<key>` are removed then too; `sayamaapps.koe.<key>` stays. The names above will be removed. Sites must rename their option keys with that update.
 
-Tests: `composer test`; all checks: `composer ci` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
+Tests: `composer test`; all checks: `composer ci` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](https://github.com/sayamaapps/kirby-koe/blob/main/CHANGELOG.md).
 
 ## Implementation notes
 
