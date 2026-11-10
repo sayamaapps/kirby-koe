@@ -40,6 +40,20 @@ class Reviews
 	/** Longer texts are cut at a word boundary. */
 	public const TRUNCATE = 280;
 
+	/**
+	 * The notice on whether and how the business checks that the reviews come
+	 * from people who used its services (section 5b (3) UWG). Plain text in the
+	 * current language, to be escaped by the template.
+	 *
+	 * Koe takes the reviews from Google and checks nothing itself, so the
+	 * default says exactly that. A business that does check sets the
+	 * `authenticityNotice` option; a non-empty string replaces the default.
+	 */
+	public static function authenticityNotice(mixed $custom): string
+	{
+		return is_string($custom) && trim($custom) !== '' ? trim($custom) : I18n::t('authenticity');
+	}
+
 	/** @return array{minRating:int, minLength:int, maxAgeMonths:int, maxCount:int, truncate:int, approved:?array, placeId:?string} */
 	public static function defaultRules(): array
 	{

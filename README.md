@@ -11,7 +11,7 @@ Koe shows a business's Google rating, its review count and a few selected review
 - Server-side fetch from the Places API (New), held in a short-lived cache (24 hours by default).
 - Rule-based selection: by default five-star reviews of at least 80 characters, the three newest, not older than 24 months.
 - Optional approved list, so the business decides which reviews appear.
-- Google attribution built in: author with profile picture, links to the review, "Google Maps" attribution, a notice on the selection.
+- Google attribution built in: author with profile picture, links to the review, "Google Maps" attribution, a notice on the selection, and the notice that the reviews come from Google and are not checked (section 5b UWG).
 - API key kept on the server; profile pictures served from your own site.
 - Demo mode with fictional sample reviews, to show the block before an API key exists.
 - English and German; no database, no cookies.
@@ -72,12 +72,14 @@ GOOGLE_PLACES_API_KEY=… KOE_QUERY="Business name, Street 1, 12345 Town" vendor
 
 ```php
 $r = site()->koeReviews();   // null: show nothing
-// rating, count, limit, profileUrl, notice, reviews[] with name, rating, text, date, month, url, avatar
+// rating, count, limit, profileUrl, notice, authenticityNotice, reviews[] with name, rating, text, date, month, url, avatar
 ```
 
 `$site->koeProfileUrl()` returns the profile link. Site snippets read options with `Sayamaapps\Koe\Options::get(kirby(), 'name', $default)`.
 
 **Google attribution.** Google's Places policies require the author with profile picture, both linked to `url`, the "Google Maps" attribution and the selection notice (`$r['notice']`, e.g. "Selection: 5 stars, 80+ characters, at most 24 months old, newest first."). The default snippet does all of it; your own markup must do the same.
+
+**Where the reviews come from (§ 5b Abs. 3 UWG).** A business that makes consumer reviews accessible must state whether and how it ensures that they come from people who actually used its services. Koe takes reviews from Google and checks nothing, so the default snippet adds "Not checked for authenticity." (German: "Nicht auf Echtheit geprüft.") as `<span class="koe-authenticity">` on the same line after the selection notice, and as `<p class="koe-authenticity">` when no single review is listed. It is on by default and has no off switch. A business that does verify its reviewers replaces the text with the `authenticityNotice` option, which must then describe what it really does. Your own markup prints `$r['authenticityNotice']`. Whether a wording suffices in a given case is for the operator to decide; this is not legal advice.
 
 ## Options
 
@@ -95,6 +97,7 @@ Keys are `sayamaapps.koe.<name>`, written flat (`'sayamaapps.koe.active' => true
 | `maxCount` | `3` | Maximum number of single reviews shown. |
 | `truncate` | `280` | Longer texts are cut at a word boundary and get "…"; `0` = never. |
 | `approved` | `null` | `null`: rules only. A list of review ids: only those, still subject to the rules. `[]`: no single reviews. |
+| `authenticityNotice` | translated | Text of the notice that the reviews are not checked for authenticity, see [Google attribution](#usage). A non-empty string replaces the default; set it only if the business really verifies its reviewers. |
 | `title` | translated | Heading of the default snippet (`Reviews on Google` / `Bewertungen auf Google`). |
 | `logo` | `null` | Path under `public/` to the official Google Maps logo. Without it, the attribution is the text "Google Maps". |
 | `language` | site language | `en` or `de`. Otherwise the site's default language, then Kirby's `locale`, then English. |
@@ -132,7 +135,7 @@ return [
 
 The option names `koe.<name>` are read until the next major version, then no longer. Translation keys `koe.<key>` are removed then too; `sayamaapps.koe.<key>` stays. The names above will be removed. Sites must rename their option keys with that update.
 
-Tests: `composer test`; all checks: `composer ci` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](CHANGELOG.md).
+Tests: `composer test`; all checks: `composer ci` (after `composer install --ignore-platform-req=ext-gd`). Issues and pull requests are welcome, without a support promise. Report security problems privately through GitHub's vulnerability reporting. Changes: [CHANGELOG.md](https://github.com/sayamaapps/kirby-koe/blob/main/CHANGELOG.md).
 
 ## Implementation notes
 
@@ -143,7 +146,7 @@ The Places client (`Sayamaapps\Koe\Places`, with its own transport: curl, or str
 - **No request from the visitor's browser.** No script, embed, font or image comes from Google. Profile pictures and the optional "Google Maps" logo are served from your site; Google opens only when a visitor clicks a link.
 - **Cache only.** Reviews and pictures stay in Kirby's cache for `sayamaapps.koe.cacheHours` at most, then they are fetched anew. Nothing else from Google is kept. The plugin sets no cookies and uses no browser storage.
 
-See [PRIVACY.md](PRIVACY.md) (English) and [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md) (German text for privacy policies). They are not legal advice.
+See [PRIVACY.md](PRIVACY.md) (English) and [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md) (German text for privacy policies); both are part of the package. They are not legal advice.
 
 ## License
 

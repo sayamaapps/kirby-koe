@@ -1,6 +1,6 @@
 # Koe: privacy notes
 
-This is an English summary of [DATENSCHUTZ.md](DATENSCHUTZ.md), the German text
+This is an English summary of [DATENSCHUTZ.md](docs/DATENSCHUTZ.md), the German text
 block for privacy policies, which is the authoritative version. Both describe
 the implementation. They are not legal advice. Each operator has to determine
 the legal basis and the wording for their own site.
@@ -36,11 +36,14 @@ the visitor.
 When a page shows the reviews and the cache holds none (the first time, and
 after the holding time ran out), the web server sends one request to the
 Places API (New), authenticated with the site's own API key: the details of
-the configured place. The request carries the place id and a language code,
-never visitor data. It is sent after the page was delivered to that visitor,
-who sees the page without reviews; the visitors after them see the reviews.
+the configured place. The request carries the place id and a language code
+and, as any request does, the web server's IP address and the API key, never
+visitor data. It is sent after the page was delivered to that visitor (under
+PHP-FPM and LiteSpeed; elsewhere that one visitor's page waits for it). That
+visitor sees the page without reviews; the visitors after them see the reviews.
 The server then fetches the profile pictures of the reviews it keeps, from
-Google's image server, without the key and without visitor data.
+Google's image server (`googleusercontent.com`), without the key and without
+visitor data.
 
 Received: the place id, the overall rating, the number of reviews, and up to
 five reviews (the API's maximum) with author display name, author profile
@@ -59,9 +62,10 @@ is not in the site's repository, not in the content, not reachable through
 the web except the pictures at `/koe/avatar/<key>` while they are shown, and
 should be excluded from backups.
 
-Everything in the cache expires after the holding time (`koe.cacheHours`,
-24 hours by default, shorter if configured) and is deleted with the next
-page view after that. Every fetch empties the cache completely before it
+Everything in the cache expires after the holding time (`sayamaapps.koe.cacheHours`,
+24 hours by default, shorter if configured). The reviews are deleted with the
+next page view after that; the stored profile pictures are replaced or removed
+at the latest with the next fetch. Every fetch empties the cache completely before it
 writes the new answer, also when that answer contains no review text (the
 page then shows only rating and count). There is no archive: a review Google
 no longer returns — withdrawn by its author, removed by Google, pushed out by
@@ -79,7 +83,10 @@ with an ellipsis) and, if an approved list is configured, only those ids. The
 author is named with profile picture; name and picture link to the review on
 Google Maps, without a safe (`http(s)`) link they are not linked. The
 "Google Maps" attribution and a notice on how the reviews were selected are
-always shown with them.
+always shown with them, followed by "Not checked for authenticity."
+(section 5b (3) UWG; the option `sayamaapps.koe.authenticityNotice`
+replaces the text, which is only accurate if the business does check). In demo
+mode it says the sample reviews are invented.
 
 The review authors are Google users whose reviews are already public on
 Google Maps. The page republishes name, picture, date, rating and (possibly
@@ -87,7 +94,7 @@ shortened) text of selected reviews.
 
 ## The API key
 
-Lives on the web server: in a Kirby option (from a configuration file that
+Lives on the web server: in the Kirby option `sayamaapps.koe.key` (from a configuration file that
 is not in the repository) or in an environment variable. It is never sent to
 the browser and never printed; error messages from Google are scrubbed of
 it. The recommendation is one Google Cloud project per client with the key

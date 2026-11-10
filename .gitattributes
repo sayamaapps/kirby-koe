@@ -1,6 +1,7 @@
 * text=auto eol=lf
 
-# Not part of the installed package (composer dist archives)
+# Not part of the installed package (composer dist archives). docs/ stays in:
+# it holds the German privacy text (docs/DATENSCHUTZ.md) that the README links to.
 /.editorconfig              export-ignore
 /.gitattributes             export-ignore
 /.gitignore                 export-ignore
@@ -12,7 +13,6 @@
 /composer-require-checker.json export-ignore
 /composer.lock         export-ignore
 /composer-unused.php        export-ignore
-/docs                       export-ignore
 /phpmd.xml.dist             export-ignore
 /phpunit.xml.dist           export-ignore
 /psalm.xml.dist             export-ignore

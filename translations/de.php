@@ -33,4 +33,7 @@ return [
 	'notice.age.one' => 'höchstens 1 Monat alt',
 	'notice.approved' => 'vom Betrieb freigegeben',
 	'notice.order' => 'neueste zuerst',
+
+	'authenticity' => 'Nicht auf Echtheit geprüft.',
+	'demo.authenticity' => 'Erfundene Beispiele.',
 ];

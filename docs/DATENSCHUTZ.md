@@ -1,7 +1,7 @@
 # Koe: technische Grundlage für den Datenschutztext
 
-(English version: [PRIVACY.md](../PRIVACY.md). Optionen heißen `koe.*`; die Namen
-stehen im [README](../README.md#options).)
+(English version: [PRIVACY.md](../PRIVACY.md). Optionen heißen `sayamaapps.koe.*`
+(bis 2.3: `koe.*`); die Namen stehen im [README](../README.md#options).)
 
 Dieser Baustein beschreibt die Implementierung. Rechtsgrundlage, Interessenabwägung
 und die Formulierung müssen vor Veröffentlichung für den konkreten Betrieb fachlich
@@ -38,10 +38,13 @@ von Google.
 
 Die Bewertungen ruft unser Webserver über die Google-Places-Schnittstelle ab,
 wenn eine Seite sie anzeigen soll und sein Zwischenspeicher keine enthält. Dabei
-werden nur die Kennung unseres Google-Eintrags und eine Sprachangabe übermittelt,
-niemals Daten unserer Website-Besucher; der Abruf erfolgt erst, nachdem die Seite
-ausgeliefert wurde. Anschließend lädt unser Server die Profilbilder der
-angezeigten Bewertungen von Google, ebenfalls ohne Besucherdaten.
+werden die Kennung unseres Google-Eintrags und eine Sprachangabe übermittelt,
+außerdem, wie bei jeder Anfrage, die Internetadresse unseres Servers und unser
+API-Schlüssel, niemals Daten unserer Website-Besucher. Der Abruf erfolgt, nachdem
+die Seite ausgeliefert wurde (unter PHP-FPM und LiteSpeed; auf anderen Servern
+wartet die Seite dieses einen Besuchers darauf). Anschließend lädt unser Server die Profilbilder der
+angezeigten Bewertungen vom Bildserver von Google (`googleusercontent.com`),
+ebenfalls ohne Besucherdaten und ohne Schlüssel.
 
 Im Zwischenspeicher unseres Webservers liegen nur die Kennung unseres
 Google-Eintrags, die Gesamtbewertung, die Anzahl der Bewertungen und die
@@ -49,8 +52,10 @@ angezeigten Bewertungen (in der Vorgabe höchstens drei) mit Anzeigename,
 Profilbild, Datum, Sternezahl, Text und Link zur Bewertung bei Google Maps.
 Weitere von Google gelieferte Bewertungen und Angaben werden sofort verworfen.
 Der Zwischenspeicher verfällt nach einer festen Haltezeit (in der Vorgabe
-24 Stunden, Option `koe.cacheHours`) und wird beim nächsten Seitenaufruf danach
-gelöscht; jeder Abruf ersetzt ihn vollständig. Es gibt keine dauerhafte Kopie
+24 Stunden, Option `sayamaapps.koe.cacheHours`); die Bewertungen werden beim nächsten
+Seitenaufruf danach gelöscht, die gespeicherten Profilbilder spätestens mit dem
+nächsten Abruf ersetzt oder entfernt. Jeder Abruf ersetzt den Zwischenspeicher
+vollständig. Es gibt keine dauerhafte Kopie
 und kein Archiv, die Bewertungen liegen weder im Inhaltsverzeichnis der Website
 noch in deren Versionsverwaltung. Eine Bewertung, die Google nicht mehr liefert
 (etwa weil sie zurückgezogen wurde), verschwindet spätestens nach Ablauf der
@@ -63,7 +68,9 @@ Auf der Website erscheinen nur Bewertungen, die festgelegte Regeln erfüllen
 und mit „…" gekennzeichnet) und gegebenenfalls nur solche, die wir ausdrücklich
 freigegeben haben. Bewertende werden mit ihrem bei Google öffentlichen
 Anzeigenamen und Profilbild genannt; beides verweist auf die Originalbewertung
-bei Google Maps. Ein Hinweis unter den Bewertungen nennt die Auswahlregeln.
+bei Google Maps. Ein Hinweis unter den Bewertungen nennt die Auswahlregeln. Ein
+weiterer Hinweis sagt, dass die Bewertungen von Google stammen und wir nicht
+prüfen, ob die Verfasser unsere Leistungen tatsächlich in Anspruch genommen haben.
 
 Das Modul setzt keine Cookies, verwendet keinen Browser-Speicher und erhebt
 keine Daten über Besucher dieser Website.
@@ -82,7 +89,7 @@ keine Daten über Besucher dieser Website.
   Sicherungen ausnehmen. Sicherungen des gesamten Webspace durch den Hoster
   können ihn für deren Aufbewahrungsdauer enthalten.
 - **Schlüssel.** Der Google-API-Schlüssel liegt auf dem Webserver (Option
-  `koe.key` aus einer Datei außerhalb des Repositorys oder Umgebungsvariable
+  `sayamaapps.koe.key` aus einer Datei außerhalb des Repositorys oder Umgebungsvariable
   `GOOGLE_PLACES_API_KEY`), nie im Browser. Empfehlung: ein eigenes
   Google-Cloud-Projekt je Betrieb, Schlüssel nur für die Places API (New),
   wenn möglich auf die IP-Adresse des Servers beschränkt, Tageskontingent
@@ -91,3 +98,16 @@ keine Daten über Besucher dieser Website.
   auf die Bewertung bei Google Maps verlinken, Attribution „Google Maps" zeigen,
   Auswahlregeln nennen. Das Vorgabe-Snippet erfüllt das; wer eigenes Markup
   baut, muss es selbst einhalten.
+- **Herkunft der Bewertungen** (§ 5b Abs. 3 UWG): Wer Verbraucherbewertungen
+  zugänglich macht, muss angeben, ob und wie er sicherstellt, dass sie von
+  Verbrauchern stammen, die die Leistung tatsächlich in Anspruch genommen
+  haben. Das Vorgabe-Snippet ergänzt den Auswahlhinweis standardmäßig um „Nicht auf
+  Echtheit geprüft.“ (Option
+  `sayamaapps.koe.authenticityNotice` ersetzt den Text). Ein anderer Text ist
+  nur zutreffend, wenn der Betrieb die Verfasser tatsächlich prüft. Eigenes
+  Markup muss den Hinweis selbst ausgeben (`$site->koeReviews()['authenticityNotice']`).
+  Ob die Formulierung im Einzelfall genügt, ist nicht Gegenstand dieses
+  Bausteins.
+- **Demo-Modus.** Er ruft nichts von Google ab und speichert nichts; die
+  Beispielbewertungen sind erfunden und als solche gekennzeichnet. Für den
+  echten Betrieb gilt der Textbaustein oben.

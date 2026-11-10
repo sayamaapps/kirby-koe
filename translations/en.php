@@ -35,4 +35,9 @@ return [
 	'notice.age.one' => 'at most 1 month old',
 	'notice.approved' => 'approved by the business',
 	'notice.order' => 'newest first',
+
+	// Section 5b (3) UWG: whether and how the business checks that reviews come from real customers.
+	// Shown by default; the `authenticityNotice` option replaces it for a business that does check.
+	'authenticity' => 'Not checked for authenticity.',
+	'demo.authenticity' => 'Invented examples.',
 ];
