@@ -12,7 +12,7 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
-## Unreleased
+## [2.6.0] — 2026-11-10
 
 ### Added
 
