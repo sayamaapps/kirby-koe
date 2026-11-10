@@ -244,18 +244,18 @@ final class KirbyTest extends TestCase
 
 	public function testAuthenticityNoticeIsShownByDefaultInEveryLanguage(): void
 	{
-		$noticeOf = fn (string $html): string|null => preg_match('~<p class="koe-authenticity">(.*?)</p>~s', $html, $m) ? $m[1] : null;
+		$noticeOf = fn (string $html): string|null => preg_match('~<(?:p|span) class="koe-authenticity">(.*?)</(?:p|span)>~s', $html, $m) ? $m[1] : null;
 		$this->fill($this->on());
 		[$r, $html] = $this->render($this->on());
-		$en = 'Reviews come from Google. We do not check whether reviewers actually used our services.';
+		$en = 'Not checked for authenticity.';
 		$this->assertSame($en, $noticeOf($html), 'default snippet: the section 5b notice is on without any option');
 		$this->assertSame($en, $r['authenticityNotice'], 'koeReviews() hands it to own snippets as well');
-		$this->assertTrue(strpos($html, 'koe-authenticity') > strpos($html, 'koe-notice'), 'it stands next to, after, the selection notice');
-		$this->assertStringContainsString('<p class="koe-notice">Selection: 5 stars, 80+ characters, at most 24 months old, newest first.</p>', $html, 'the selection notice is unchanged');
+		$this->assertTrue(strpos($html, 'koe-authenticity') > strpos($html, 'koe-notice'), 'it stands on the same line, after the selection notice');
+		$this->assertStringContainsString('<p class="koe-notice">Selection: 5 stars, 80+ characters, at most 24 months old, newest first. <span class="koe-authenticity">Not checked for authenticity.</span></p>', $html, 'one line: selection notice unchanged, authenticity notice after it');
 		$german = ['koe.language' => 'de'] + $this->on();
 		$this->fill($german);
 		[, $html] = $this->render($german);
-		$this->assertSame('Die Bewertungen stammen von Google. Wir prüfen nicht, ob die Verfasser unsere Leistungen tatsächlich in Anspruch genommen haben.', $noticeOf($html), 'German text');
+		$this->assertSame('Nicht auf Echtheit geprüft.', $noticeOf($html), 'German text');
 		$none = ['koe.approved' => []] + $this->on();
 		$this->fill($none);
 		[, $html] = $this->render($none);
@@ -269,14 +269,14 @@ final class KirbyTest extends TestCase
 		$this->fill($own);
 		$kirby = $this->app($own);
 		$raw = (string)$kirby->snippet('koe/reviews', [], true);
-		$this->assertStringContainsString('<p class="koe-authenticity">We contact every reviewer &lt;b&gt;before&lt;/b&gt; publishing.</p>', $raw, 'own text, escaped');
-		$this->assertStringNotContainsString('Reviews come from Google', $raw, 'the default text is replaced');
+		$this->assertStringContainsString('<span class="koe-authenticity">We contact every reviewer &lt;b&gt;before&lt;/b&gt; publishing.</span>', $raw, 'own text, escaped');
+		$this->assertStringNotContainsString('Not checked for authenticity', $raw, 'the default text is replaced');
 		$this->assertSame('We contact every reviewer <b>before</b> publishing.', $kirby->site()->koeReviews()['authenticityNotice'], 'the raw text goes to own snippets');
 		[$r] = $this->render(['koe.authenticityNotice' => 'Old spelling.'] + $this->on());
 		$this->assertSame('Old spelling.', $r['authenticityNotice'], 'koe.* fallback');
 		foreach (['', '   ', false, ['x']] as $unusable) {
 			[$r] = $this->render(['sayamaapps.koe.authenticityNotice' => $unusable] + $this->on());
-			$this->assertStringStartsWith('Reviews come from Google.', $r['authenticityNotice'], 'an unusable value falls back to the default text');
+			$this->assertSame('Not checked for authenticity.', $r['authenticityNotice'], 'an unusable value falls back to the default text');
 		}
 	}
 
@@ -348,11 +348,11 @@ final class KirbyTest extends TestCase
 	{
 		$demo = ['koe.active' => true, 'sayamaapps.koe.demo' => true, 'sayamaapps.koe.authenticityNotice' => 'We verify every reviewer.'];
 		[$r, $html] = $this->render($demo);
-		$this->assertSame('These sample reviews are invented and do not come from real customers.', $r['authenticityNotice'], 'demo: sample text, the override does not apply');
-		$this->assertStringContainsString('<p class="koe-authenticity">These sample reviews are invented and do not come from real customers.</p>', $html);
+		$this->assertSame('Invented examples.', $r['authenticityNotice'], 'demo: sample text, the override does not apply');
+		$this->assertStringContainsString('<span class="koe-authenticity">Invented examples.</span>', $html);
 		$this->assertStringNotContainsString('Google', $html, 'no Google branding in demo');
 		[, $german] = $this->render($demo + ['koe.language' => 'de']);
-		$this->assertStringContainsString('<p class="koe-authenticity">Diese Beispielbewertungen sind erfunden und stammen nicht von echten Kundinnen und Kunden.</p>', $german);
+		$this->assertStringContainsString('<span class="koe-authenticity">Erfundene Beispiele.</span>', $german);
 	}
 
 	public function testDemoShowsSampleReviewsWithoutKeyRequestOrCache(): void
@@ -501,7 +501,7 @@ final class KirbyTest extends TestCase
 	public function testNoticeIsWordedFromTheOptions(): void
 	{
 		$this->answer = ['id' => 'ChIJExample', 'rating' => 4.8, 'userRatingCount' => 201, 'reviews' => [$this->review('Notice', '-3 days', null, 5, 'id-notice')]];
-		$noticeOf = fn (string $html): string|null => preg_match('~<p class="koe-notice">(.*?)</p>~s', $html, $m) ? $m[1] : null;
+		$noticeOf = fn (string $html): string|null => preg_match('~<p class="koe-notice">(.*?)(?: <span class="koe-authenticity">.*?</span>)?</p>~s', $html, $m) ? $m[1] : null;
 		$defaultEn = 'Selection: 5 stars, 80+ characters, at most 24 months old, newest first.';
 		$this->fill($this->on());
 		[$r, $html] = $this->render($this->on());

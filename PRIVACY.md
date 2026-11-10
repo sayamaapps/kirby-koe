@@ -83,9 +83,8 @@ with an ellipsis) and, if an approved list is configured, only those ids. The
 author is named with profile picture; name and picture link to the review on
 Google Maps, without a safe (`http(s)`) link they are not linked. The
 "Google Maps" attribution and a notice on how the reviews were selected are
-always shown with them, and below them a notice that the reviews come from
-Google and that the business does not check whether the authors used its
-services (section 5b (3) UWG; the option `sayamaapps.koe.authenticityNotice`
+always shown with them, followed by "Not checked for authenticity."
+(section 5b (3) UWG; the option `sayamaapps.koe.authenticityNotice`
 replaces the text, which is only accurate if the business does check). In demo
 mode it says the sample reviews are invented.
 

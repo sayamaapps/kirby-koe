@@ -101,8 +101,8 @@ keine Daten über Besucher dieser Website.
 - **Herkunft der Bewertungen** (§ 5b Abs. 3 UWG): Wer Verbraucherbewertungen
   zugänglich macht, muss angeben, ob und wie er sicherstellt, dass sie von
   Verbrauchern stammen, die die Leistung tatsächlich in Anspruch genommen
-  haben. Das Vorgabe-Snippet druckt unter den Bewertungen standardmäßig, dass
-  sie von Google stammen und nicht geprüft werden (Option
+  haben. Das Vorgabe-Snippet ergänzt den Auswahlhinweis standardmäßig um „Nicht auf
+  Echtheit geprüft.“ (Option
   `sayamaapps.koe.authenticityNotice` ersetzt den Text). Ein anderer Text ist
   nur zutreffend, wenn der Betrieb die Verfasser tatsächlich prüft. Eigenes
   Markup muss den Hinweis selbst ausgeben (`$site->koeReviews()['authenticityNotice']`).

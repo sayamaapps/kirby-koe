@@ -34,6 +34,6 @@ return [
 	'notice.approved' => 'vom Betrieb freigegeben',
 	'notice.order' => 'neueste zuerst',
 
-	'authenticity' => 'Die Bewertungen stammen von Google. Wir prüfen nicht, ob die Verfasser unsere Leistungen tatsächlich in Anspruch genommen haben.',
-	'demo.authenticity' => 'Diese Beispielbewertungen sind erfunden und stammen nicht von echten Kundinnen und Kunden.',
+	'authenticity' => 'Nicht auf Echtheit geprüft.',
+	'demo.authenticity' => 'Erfundene Beispiele.',
 ];

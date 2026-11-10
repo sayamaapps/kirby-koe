@@ -16,7 +16,7 @@ All notable changes to this project are documented here. Versions follow
 
 ### Added
 
-- **Notice on where the reviews come from** (§ 5b Abs. 3 UWG): the default snippet now prints `<p class="koe-authenticity">` below the selection notice, by default "Reviews come from Google. We do not check whether reviewers actually used our services." / German equivalent, also when no single review is listed. Option `sayamaapps.koe.authenticityNotice` replaces the text for a business that does check its reviewers; there is no switch to turn the notice off. In demo mode the notice says the sample reviews are invented. `$site->koeReviews()` returns `authenticityNotice`; own snippets must print it. Translation keys `authenticity` and `demo.authenticity`.
+- **Notice on where the reviews come from** (§ 5b Abs. 3 UWG): the default snippet now adds "Not checked for authenticity." / "Nicht auf Echtheit geprüft." on the same line after the selection notice (`<span class="koe-authenticity">`), and as `<p class="koe-authenticity">` when no single review is listed. Option `sayamaapps.koe.authenticityNotice` replaces the text for a business that does check its reviewers; there is no switch to turn the notice off. In demo mode it reads "Invented examples." / "Erfundene Beispiele." `$site->koeReviews()` returns `authenticityNotice`; own snippets must print it. Translation keys `authenticity` and `demo.authenticity`.
 
 ### Fixed
 

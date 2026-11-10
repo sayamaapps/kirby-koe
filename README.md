@@ -79,7 +79,7 @@ $r = site()->koeReviews();   // null: show nothing
 
 **Google attribution.** Google's Places policies require the author with profile picture, both linked to `url`, the "Google Maps" attribution and the selection notice (`$r['notice']`, e.g. "Selection: 5 stars, 80+ characters, at most 24 months old, newest first."). The default snippet does all of it; your own markup must do the same.
 
-**Where the reviews come from (§ 5b Abs. 3 UWG).** A business that makes consumer reviews accessible must state whether and how it ensures that they come from people who actually used its services. Koe takes reviews from Google and checks nothing, so the default snippet prints, below the selection notice and also when no single review is listed, `<p class="koe-authenticity">`: "Reviews come from Google. We do not check whether reviewers actually used our services." (German: "Die Bewertungen stammen von Google. Wir prüfen nicht, ob die Verfasser unsere Leistungen tatsächlich in Anspruch genommen haben."). It is on by default and has no off switch. A business that does verify its reviewers replaces the text with the `authenticityNotice` option, which must then describe what it really does. Your own markup prints `$r['authenticityNotice']`. Whether a wording suffices in a given case is for the operator to decide; this is not legal advice.
+**Where the reviews come from (§ 5b Abs. 3 UWG).** A business that makes consumer reviews accessible must state whether and how it ensures that they come from people who actually used its services. Koe takes reviews from Google and checks nothing, so the default snippet adds "Not checked for authenticity." (German: "Nicht auf Echtheit geprüft.") as `<span class="koe-authenticity">` on the same line after the selection notice, and as `<p class="koe-authenticity">` when no single review is listed. It is on by default and has no off switch. A business that does verify its reviewers replaces the text with the `authenticityNotice` option, which must then describe what it really does. Your own markup prints `$r['authenticityNotice']`. Whether a wording suffices in a given case is for the operator to decide; this is not legal advice.
 
 ## Options
 
@@ -97,7 +97,7 @@ Keys are `sayamaapps.koe.<name>`, written flat (`'sayamaapps.koe.active' => true
 | `maxCount` | `3` | Maximum number of single reviews shown. |
 | `truncate` | `280` | Longer texts are cut at a word boundary and get "…"; `0` = never. |
 | `approved` | `null` | `null`: rules only. A list of review ids: only those, still subject to the rules. `[]`: no single reviews. |
-| `authenticityNotice` | translated | Text of the notice on where the reviews come from and that they are not checked, see [Google attribution](#usage). A non-empty string replaces the default; set it only if the business really verifies its reviewers. |
+| `authenticityNotice` | translated | Text of the notice that the reviews are not checked for authenticity, see [Google attribution](#usage). A non-empty string replaces the default; set it only if the business really verifies its reviewers. |
 | `title` | translated | Heading of the default snippet (`Reviews on Google` / `Bewertungen auf Google`). |
 | `logo` | `null` | Path under `public/` to the official Google Maps logo. Without it, the attribution is the text "Google Maps". |
 | `language` | site language | `en` or `de`. Otherwise the site's default language, then Kirby's `locale`, then English. |
