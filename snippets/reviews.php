@@ -18,7 +18,9 @@
  * on Google" tile. Below the single reviews a notice says how they were
  * selected and sorted (Google Places policies); it is worded from the options
  * in force. With the module off or nothing in the cache yet, the section is
- * omitted entirely. Deliberately no structured data: Google ignores review
+ * omitted entirely. Below, always, goes the authenticity notice (section 5b (3)
+ * UWG): that the reviews come from Google and are not checked for real
+ * customers, or the text of the `authenticityNotice` option. Deliberately no structured data: Google ignores review
  * markup a business publishes about itself. No CSS: the grid belongs to the
  * site (classes koe-*).
  *
@@ -86,4 +88,5 @@ $viewProfile = $profile
 	</ul>
 	<p class="koe-notice"><?= esc($r['notice']) ?></p>
 	<?php endif ?>
+	<p class="koe-authenticity"><?= esc($r['authenticityNotice']) ?></p>
 </section>

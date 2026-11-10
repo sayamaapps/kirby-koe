@@ -12,13 +12,18 @@ return [
 	 *
 	 *   ['rating' => 4.8, 'count' => 201, 'placeId' => 'ChIJ…',
 	 *    'reviews' => [['id', 'name', 'rating', 'text', 'date', 'month', 'url', 'avatar'], …],
-	 *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…', 'demo' => false]
+	 *    'limit' => 3, 'profileUrl' => 'https://…'|null, 'notice' => '…', 'authenticityNotice' => '…', 'demo' => false]
 	 *
 	 * `limit` is the configured maximum: a snippet fills the remaining
 	 * slots with a "read all on Google" tile when count(reviews) < limit.
 	 * `notice` tells visitors how the reviews were selected and sorted,
 	 * worded from the options in force (plain text, in the snippet's
 	 * language); a snippet that lists single reviews prints it.
+	 * `authenticityNotice` says whether the business checks that the
+	 * reviewers really used its services (section 5b (3) UWG): by default
+	 * that the reviews come from Google and are not checked, or the text of
+	 * the `authenticityNotice` option; a snippet prints it, also when no
+	 * single review is listed. In demo mode it says the samples are invented.
 	 * `demo` is true for the sample reviews of the `demo` option: then
 	 * there is no profile link, and a snippet must not show Google's name
 	 * or logo but say that these are samples.

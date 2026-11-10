@@ -7,6 +7,7 @@
 return [
 	'active'       => null,
 	'approved'     => null,
+	'authenticityNotice' => null,
 	'cacheHours'   => null,
 	'demo'         => null,
 	'key'          => null,

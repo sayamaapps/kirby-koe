@@ -55,6 +55,20 @@ class Reviews
 	}
 
 	/**
+	 * The notice on whether and how the business checks that the reviews come
+	 * from people who used its services (section 5b (3) UWG). Plain text in the
+	 * current language, to be escaped by the template.
+	 *
+	 * Koe takes the reviews from Google and checks nothing itself, so the
+	 * default says exactly that. A business that does check sets the
+	 * `authenticityNotice` option; a non-empty string replaces the default.
+	 */
+	public static function authenticityNotice(mixed $custom): string
+	{
+		return is_string($custom) && trim($custom) !== '' ? trim($custom) : I18n::t('authenticity');
+	}
+
+	/**
 	 * The reviews that pass the rules (rating, length, age, approval), newest
 	 * first, at most `maxCount`, otherwise as they came: what the cache keeps.
 	 *

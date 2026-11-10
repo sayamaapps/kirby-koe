@@ -23,10 +23,10 @@ class Site
 	}
 
 	/**
-	 * Reviews of the configured place, with the notice and the profile address,
+	 * Reviews of the configured place, with the notices and the profile address,
 	 * or the sample reviews in demo mode (`demo` true, no profile address), or null when nothing is to be shown.
 	 *
-	 * @return array{rating: float, count: int, placeId: ?string, reviews: array<int, array<string, mixed>>, limit: int, notice: string, profileUrl: string|null, demo: bool}|null
+	 * @return array{rating: float, count: int, placeId: ?string, reviews: array<int, array<string, mixed>>, limit: int, notice: string, authenticityNotice: string, profileUrl: string|null, demo: bool}|null
 	 */
 	public static function reviews(App $kirby, string|null $profileUrl): array|null
 	{
@@ -41,6 +41,10 @@ class Site
 		}
 		$demo = Options::demo($kirby);
 		$result['notice'] = Reviews::notice($rules);
+		// Sample reviews come from no one: they always get the sample text, never a site's own statement about real reviewers.
+		$result['authenticityNotice'] = $demo
+			? I18n::t('demo.authenticity')
+			: Reviews::authenticityNotice(Options::get($kirby, 'authenticityNotice'));
 		// Sample reviews link to no Google profile.
 		$result['profileUrl'] = $demo ? null : $profileUrl;
 		$result['demo'] = $demo;

@@ -242,6 +242,44 @@ final class KirbyTest extends TestCase
 		$this->assertTrue(str_contains($html, '/assets/logo.svg"'), 'snippet data null falls back to the option');
 	}
 
+	public function testAuthenticityNoticeIsShownByDefaultInEveryLanguage(): void
+	{
+		$noticeOf = fn (string $html): string|null => preg_match('~<p class="koe-authenticity">(.*?)</p>~s', $html, $m) ? $m[1] : null;
+		$this->fill($this->on());
+		[$r, $html] = $this->render($this->on());
+		$en = 'Reviews come from Google. We do not check whether reviewers actually used our services.';
+		$this->assertSame($en, $noticeOf($html), 'default snippet: the section 5b notice is on without any option');
+		$this->assertSame($en, $r['authenticityNotice'], 'koeReviews() hands it to own snippets as well');
+		$this->assertTrue(strpos($html, 'koe-authenticity') > strpos($html, 'koe-notice'), 'it stands next to, after, the selection notice');
+		$this->assertStringContainsString('<p class="koe-notice">Selection: 5 stars, 80+ characters, at most 24 months old, newest first.</p>', $html, 'the selection notice is unchanged');
+		$german = ['koe.language' => 'de'] + $this->on();
+		$this->fill($german);
+		[, $html] = $this->render($german);
+		$this->assertSame('Die Bewertungen stammen von Google. Wir prüfen nicht, ob die Verfasser unsere Leistungen tatsächlich in Anspruch genommen haben.', $noticeOf($html), 'German text');
+		$none = ['koe.approved' => []] + $this->on();
+		$this->fill($none);
+		[, $html] = $this->render($none);
+		$this->assertSame($en, $noticeOf($html), 'rating and count without single reviews are covered too');
+		$this->assertStringNotContainsString('koe-notice', $html, 'no selection notice without single reviews, as before');
+	}
+
+	public function testAuthenticityNoticeTextCanBeOverridden(): void
+	{
+		$own = ['sayamaapps.koe.authenticityNotice' => 'We contact every reviewer <b>before</b> publishing.'] + $this->on();
+		$this->fill($own);
+		$kirby = $this->app($own);
+		$raw = (string)$kirby->snippet('koe/reviews', [], true);
+		$this->assertStringContainsString('<p class="koe-authenticity">We contact every reviewer &lt;b&gt;before&lt;/b&gt; publishing.</p>', $raw, 'own text, escaped');
+		$this->assertStringNotContainsString('Reviews come from Google', $raw, 'the default text is replaced');
+		$this->assertSame('We contact every reviewer <b>before</b> publishing.', $kirby->site()->koeReviews()['authenticityNotice'], 'the raw text goes to own snippets');
+		[$r] = $this->render(['koe.authenticityNotice' => 'Old spelling.'] + $this->on());
+		$this->assertSame('Old spelling.', $r['authenticityNotice'], 'koe.* fallback');
+		foreach (['', '   ', false, ['x']] as $unusable) {
+			[$r] = $this->render(['sayamaapps.koe.authenticityNotice' => $unusable] + $this->on());
+			$this->assertStringStartsWith('Reviews come from Google.', $r['authenticityNotice'], 'an unusable value falls back to the default text');
+		}
+	}
+
 	public function testCachedReviewsAreShownWithoutAnyRequest(): void
 	{
 		$this->fill($this->on());
@@ -328,6 +366,17 @@ final class KirbyTest extends TestCase
 		$this->assertCount(1, $this->queue, 'switched to live: the first view fetches');
 		[$off] = $this->render(['sayamaapps.koe.demo' => true]);
 		$this->assertNull($off, 'demo needs active');
+	}
+
+	public function testDemoModeSaysTheSampleReviewsAreInvented(): void
+	{
+		$demo = ['koe.active' => true, 'sayamaapps.koe.demo' => true, 'sayamaapps.koe.authenticityNotice' => 'We verify every reviewer.'];
+		[$r, $html] = $this->render($demo);
+		$this->assertSame('These sample reviews are invented and do not come from real customers.', $r['authenticityNotice'], 'demo: sample text, the override does not apply');
+		$this->assertStringContainsString('<p class="koe-authenticity">These sample reviews are invented and do not come from real customers.</p>', $html);
+		$this->assertStringNotContainsString('Google', $html, 'no Google branding in demo');
+		[, $german] = $this->render($demo + ['koe.language' => 'de']);
+		$this->assertStringContainsString('<p class="koe-authenticity">Diese Beispielbewertungen sind erfunden und stammen nicht von echten Kundinnen und Kunden.</p>', $german);
 	}
 
 	public function testEmptyApprovalAndNestedSpelling(): void

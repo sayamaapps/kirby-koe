@@ -12,6 +12,16 @@ All notable changes to this project are documented here. Versions follow
   **[privacy text]**. Every site using the plugin must then review its privacy
   policy.
 
+## Unreleased
+
+### Added
+
+- **Notice on where the reviews come from** (§ 5b Abs. 3 UWG): the default snippet now prints `<p class="koe-authenticity">` below the selection notice, by default "Reviews come from Google. We do not check whether reviewers actually used our services." / German equivalent, also when no single review is listed. Option `sayamaapps.koe.authenticityNotice` replaces the text for a business that does check its reviewers; there is no switch to turn the notice off. In demo mode the notice says the sample reviews are invented. `$site->koeReviews()` returns `authenticityNotice`; own snippets must print it. Translation keys `authenticity` and `demo.authenticity`.
+
+### Fixed
+
+- **[privacy text]** `docs/DATENSCHUTZ.md` was export-ignored, so Composer and ZIP installs did not contain the German privacy text the README links to; it is part of the package now. The text names the option as `sayamaapps.koe.*` (it said `koe.*`), says that the server's IP address and the API key reach Google with the Places request and that profile pictures come from `googleusercontent.com`, and mentions the new notice and demo mode. `PRIVACY.md` is updated likewise.
+
 ## [2.5.0] — 2026-11-06
 
 ### Added
