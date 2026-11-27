@@ -2,7 +2,7 @@
 
 Google reviews for [Kirby CMS](https://getkirby.com), served from your own server.
 
-**Kirby 5 · PHP 8.2–8.5 · `sayamaapps/kirby-koe` 2.x**
+**Kirby 5 and 6 · PHP 8.2–8.5 · `sayamaapps/kirby-koe` 2.x**
 
 Koe shows a business's Google rating, its review count and a few selected reviews on a Kirby site. The server fetches them from the Places API (New) and keeps them in a short-lived cache, so visitors' browsers never contact Google.
 
@@ -19,7 +19,7 @@ Koe shows a business's Google rating, its review count and a few selected review
 ## Requirements
 
 - PHP 8.2–8.5 with `mbstring`; `curl` recommended. Outgoing HTTPS to `places.googleapis.com` and `*.googleusercontent.com`.
-- Kirby 5 with a writable cache directory (`site/cache/` by default).
+- Kirby 5 or 6 (Kirby 6 needs PHP 8.3 or newer) with a writable cache directory (`site/cache/` by default).
 - A Google Cloud project with **Places API (New)** enabled and an API key restricted to that API. Use one project and key per site, and cap the daily quota: a fetch is one request, so 30 per day is enough at any `sayamaapps.koe.cacheHours`.
 
 ## Installation
